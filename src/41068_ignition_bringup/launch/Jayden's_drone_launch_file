@@ -1,0 +1,106 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description():
+
+    ld = LaunchDescription()
+
+    # Get package paths
+    pkg_path = FindPackageShare('41068_ignition_bringup')
+    config_path = PathJoinSubstitution([pkg_path, 'config'])
+
+    # ----- Launch arguments -----
+    use_sim_time_launch_arg = DeclareLaunchArgument(
+        'use_sim_time', default_value='True',
+        description='Flag to enable use_sim_time'
+    )
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    ld.add_action(use_sim_time_launch_arg)
+
+    rviz_launch_arg = DeclareLaunchArgument(
+        'rviz', default_value='False',
+        description='Flag to launch RViz'
+    )
+    ld.add_action(rviz_launch_arg)
+
+    nav2_launch_arg = DeclareLaunchArgument(
+        'nav2', default_value='False',
+        description='Flag to launch Nav2'
+    )
+    ld.add_action(nav2_launch_arg)
+
+    world_launch_arg = DeclareLaunchArgument(
+        'world', default_value='simple_trees',
+        description='Which world to load',
+        choices=['simple_trees', 'large_demo']
+    )
+    ld.add_action(world_launch_arg)
+
+    # ----- Start Gazebo -----
+    gazebo = IncludeLaunchDescription(
+        PathJoinSubstitution([
+            FindPackageShare('ros_ign_gazebo'),
+            'launch',
+            'ign_gazebo.launch.py'
+        ]),
+        launch_arguments={
+            'ign_args': [
+                PathJoinSubstitution([
+                    pkg_path, 'worlds',
+                    [LaunchConfiguration('world'), '.sdf']
+                ]),
+                ' -r'
+            ]
+        }.items()
+    )
+    ld.add_action(gazebo)
+
+    # ----- X500 spawner (from SDF) -----
+    drone_spawner = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-entity', 'x500',
+            '-file', PathJoinSubstitution([pkg_path, 'models', 'x500', 'model.sdf']),
+            '-x', '0', '-y', '0', '-z', '1'
+        ],
+        output='screen'
+    )
+    ld.add_action(drone_spawner)
+
+    # ----- Gazebo bridge -----
+    gazebo_bridge = Node(
+        package='ros_ign_bridge',
+        executable='parameter_bridge',
+        parameters=[{
+            'config_file': PathJoinSubstitution([config_path, 'gazebo_bridge.yaml']),
+            'use_sim_time': use_sim_time
+        }]
+    )
+    ld.add_action(gazebo_bridge)
+
+    # ----- RViz (optional) -----
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['-d', PathJoinSubstitution([config_path, '41068.rviz'])],
+        condition=IfCondition(LaunchConfiguration('rviz'))
+    )
+    ld.add_action(rviz_node)
+
+    # ----- Nav2 (optional) -----
+    nav2 = IncludeLaunchDescription(
+        PathJoinSubstitution([pkg_path, 'launch', '41068_navigation.launch.py']),
+        launch_arguments={'use_sim_time': use_sim_time}.items(),
+        condition=IfCondition(LaunchConfiguration('nav2'))
+    )
+    ld.add_action(nav2)
+
+    return ld
