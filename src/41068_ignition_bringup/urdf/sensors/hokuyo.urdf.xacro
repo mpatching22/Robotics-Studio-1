@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="hokuyo_sensor_block">
+
+  <!-- Define reusable Hokuyo macro -->
+  <xacro:macro name="hokuyo_sensor"
+               params="joint_name parent:=base_link xyz:='0.20 0.0 0.10' rpy:='0 0 0'
+                       frame:=hokuyo_link topic:='~/hokuyo/scan' sensor_name:=hokuyo">
+
+    <link name="${frame}">
+      <visual>
+        <geometry><box size="0.05 0.05 0.05"/></geometry>
+        <material><color rgba="0.2 0.2 0.2 1.0"/></material>
+      </visual>
+
+      <!-- REQUIRED: inertial + inertia matrix -->
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.1"/>
+        <!-- 0.05 m cube @ 0.1 kg -> ~4.1667e-05 on each axis -->
+        <inertia ixx="4.1667e-05" ixy="0" ixz="0"
+                 iyy="4.1667e-05" iyz="0"
+                 izz="4.1667e-05"/>
+      </inertial>
+
+      <collision>
+        <geometry><box size="0.05 0.05 0.05"/></geometry>
+      </collision>
+    </link>
+
+    <joint name="${joint_name}" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${frame}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <gazebo reference="${frame}">
+      <sensor name="${sensor_name}" type="gpu_lidar">
+        <update_rate>10</update_rate>
+        <visualize>true</visualize>
+        <topic>${topic}</topic>
+        <lidar>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1</resolution>
+            <min_angle>-2.356</min_angle>
+            <max_angle> 2.356</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>1</samples>
+            <resolution>1</resolution>
+            <min_angle>0</min_angle>
+            <max_angle>0</max_angle>
+          </vertical>
+          <range>
+            <min>0.12</min>
+            <max>30.0</max>
+            <resolution>0.01</resolution>
+          </range>
+        </lidar>
+      </sensor>
+    </gazebo>
+
+  </xacro:macro>
+</robot>

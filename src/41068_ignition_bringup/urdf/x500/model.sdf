@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version='1.9'>
+  <model name='x500-fpv'>
+    <include merge='true'>
+      <uri>https://fuel.gazebosim.org/1.0/PX4/models/x500</uri>
+    </include>
+    <include merge='true'>
+      <uri>https://fuel.gazebosim.org/1.0/rg28/models/FPV Camera</uri>
+      <pose>.09 -0.05 .21 0 0.785 0</pose>
+    </include>
+    <joint name="CameraJoint" type="fixed">
+      <parent>base_link</parent>
+      <child>fpv_cam/base_link</child>
+      <pose relative_to="base_link">.12 .03 .242 0 0 0</pose>
+    </joint>
+  </model>
+</sdf>
