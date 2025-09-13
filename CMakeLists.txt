@@ -20,4 +20,10 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# Install Python nodes (executables) into lib/${PROJECT_NAME}
+install(PROGRAMS
+  nodes/gui.node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

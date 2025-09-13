@@ -1,0 +1,62 @@
+STATUS OF THE DRONE
+    /movement/status — std_msgs/msg/String
+
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Landed'}"
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Landing'}"
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Taking off'}"
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Halted'}"
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Moving to goal'}"
+    ros2 topic pub --once /movement/status std_msgs/msg/String "{data: 'Arrived at goal'}"
+
+
+DRONE INFORMATION
+
+    DRONE POSE - Not sure if this works
+        ros2 topic info /pose
+
+        ros2 topic pub --once /pose geometry_msgs/msg/PoseWithCovarianceStamped \
+        "{header:{frame_id: map}, pose:{pose:{position:{x: 10.1, y:-3.2, z:1.8}}}}"
+
+        #Don't think this one works
+        ros2 topic pub --once /pose geometry_msgs/msg/PoseStamped \
+        "{header:{frame_id: map}, pose:{position:{x: 10.1, y:-3.2, z:1.8}}}"
+
+CAMERA OF THE DRONE
+
+    # Publishes a stream to /camera/image
+    ros2 run image_tools cam2image --ros-args -r image:=/camera/image
+
+COMMANDS FROM GUI
+
+    MOVEMENT COMMAND
+        - HALT
+        - MOVE TO GOAL
+        - LAND
+        - TAKEOFF
+        - MERGENCY LAND
+
+        ros2 topic echo /cmd/control
+
+    TARGET GOAL
+        ros2 topic echo /cmd/goal
+        ros2 topic pub --once /cmd/goal geometry_msgs/msg/PointStamped \
+        "{header:{frame_id: map}, point:{x: 5.0, y: 1.0, z: 0.0}}"
+
+    TARGET HEIGHT
+        ros2 topic echo /cmd/height
+        ros2 topic pub --once /cmd/height std_msgs/msg/Float32 "{data: 3.5}"
+
+GOAL DETAILS
+
+    GOAL POSITION
+        # /goal/position  (geometry_msgs/PointStamped)
+        ros2 topic pub --once /goal/position geometry_msgs/msg/PointStamped \
+        "{header:{frame_id: map}, point:{x: 12.0, y: -4.0, z: 2.2}}"
+
+    DISTANCE TO GOAL
+        # /goal/distance  (std_msgs/Float32) — GUI shows “m”
+        ros2 topic pub --once /goal/distance std_msgs/msg/Float32 "{data: 18.6}"
+
+    TIME TO GOAL
+        # /goal/time  (std_msgs/Float32) — total seconds (your GUI formats to h/m/s)
+        ros2 topic pub --once /goal/time std_msgs/msg/Float32 "{data: 205.0}"

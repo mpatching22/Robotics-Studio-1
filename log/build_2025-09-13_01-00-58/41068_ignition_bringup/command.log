@@ -1,6 +1,0 @@
-Invoking command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/jaydenhazell/rs1 -DCMAKE_INSTALL_PREFIX=/home/jaydenhazell/rs1/install/41068_ignition_bringup
-Invoked command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/jaydenhazell/rs1 -DCMAKE_INSTALL_PREFIX=/home/jaydenhazell/rs1/install/41068_ignition_bringup
-Invoking command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/jaydenhazell/rs1/build/41068_ignition_bringup -- -j24 -l24
-Invoked command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/jaydenhazell/rs1/build/41068_ignition_bringup -- -j24 -l24
-Invoking command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/jaydenhazell/rs1/build/41068_ignition_bringup
-Invoked command in '/home/jaydenhazell/rs1/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/jaydenhazell/rs1/build/41068_ignition_bringup

@@ -8,7 +8,6 @@ Launch the drone
 ros2 launch trailblazer mission.launch.py
 
 With SLAM + Navigation + RViz + Large demo (change to simple_trees for smaller enviroment)
-ros2 launch trailblazer mission.launch.py slam:=true nav2:=true rviz:=true world:=large_demo
 
 
 Installs Required
@@ -25,3 +24,4 @@ To access the file explorer from the current wsl directory
 explorer.exe .
 
  ros2 topic list
+

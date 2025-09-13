@@ -19,6 +19,13 @@
   gz_type_name: 'ignition.msgs.Odometry'
   direction: GZ_TO_ROS
 
+  #ros_topic_name: '/pose'
+- ros_topic_name: '/pose'
+  gz_topic_name: '/model/parrot/pose'
+  ros_type_name: 'geometry_msgs/msg/PoseStamped'
+  gz_type_name: 'ignition.msgs.Pose'
+  direction: GZ_TO_ROS
+
 # Intertial Measurement Unit
 - ros_topic_name: '/imu'
   gz_topic_name: '/model/parrot/imu'
