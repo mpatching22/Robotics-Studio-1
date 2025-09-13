@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(41068_ignition_bringup)
+project(trailblazer)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -11,7 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ros_ign_interfaces REQUIRED)
 
 install(
-  DIRECTORY config launch models urdf worlds urdf_drone
+  DIRECTORY config launch models worlds urdf_drone
   DESTINATION share/${PROJECT_NAME}
 )
 

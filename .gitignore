@@ -1,0 +1,7 @@
+# ROS 2 colcon build artifacts
+build/
+install/
+log/
+
+# Old README file from demo
+.oldREADME.txt

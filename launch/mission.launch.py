@@ -13,7 +13,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Get paths to directories
-    pkg_path = FindPackageShare('41068_ignition_bringup')
+    pkg_path = FindPackageShare('trailblazer')
     config_path = PathJoinSubstitution([pkg_path,
                                        'config'])
 
@@ -42,8 +42,8 @@ def generate_launch_description():
     robot_description_content = ParameterValue(
         Command(['xacro ',
                  PathJoinSubstitution([pkg_path,
-                                       'urdf',
-                                       'husky.urdf.xacro'])]),
+                                       'urdf_drone',
+                                       'parrot.urdf.xacro'])]),
         value_type=str)
     robot_state_publisher_node = Node(package='robot_state_publisher',
                                       executable='robot_state_publisher',
@@ -90,7 +90,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '0.4']
+        arguments=['-topic', '/robot_description', '-z', '2.0'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -99,7 +99,7 @@ def generate_launch_description():
         package='ros_ign_bridge',
         executable='parameter_bridge',
         parameters=[{'config_file': PathJoinSubstitution([config_path,
-                                                          'gazebo_bridge.yaml']),
+                                                          'gazebo_bridge.yaml']), 
                     'use_sim_time': use_sim_time}]
     )
     ld.add_action(gazebo_bridge)
@@ -120,12 +120,20 @@ def generate_launch_description():
     nav2 = IncludeLaunchDescription(
         PathJoinSubstitution([pkg_path,
                               'launch',
-                              '41068_navigation.launch.py']),
+                              'navigation.launch.py']),
         launch_arguments={
             'use_sim_time': use_sim_time
         }.items(),
         condition=IfCondition(LaunchConfiguration('nav2'))
     )
     ld.add_action(nav2)
+
+    gui_node = Node(
+        package='trailblazer',              # your package name
+        executable='gui.node.py',           # the Python entrypoint file
+        name='trailblazer_gui',
+        output='screen'
+    )
+    ld.add_action(gui_node)
 
     return ld

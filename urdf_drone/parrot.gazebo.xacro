@@ -11,7 +11,7 @@
       <always_on>true</always_on>
       <visualize>$(arg imu_visual)</visualize>
       <update_rate>100</update_rate>
-      <topic>model/husky/imu</topic>
+      <topic>model/parrot/imu</topic>
       <gz_frame_id>imu_link</gz_frame_id>
       <imu>
         <angular_velocity>
@@ -80,7 +80,7 @@
     <plugin
       filename="ignition-gazebo-velocity-control-system"
       name="ignition::gazebo::systems::VelocityControl">
-      <topic>model/husky/cmd_vel</topic>
+      <topic>model/parrot/cmd_vel</topic>
     </plugin>
   </gazebo>
 
@@ -89,7 +89,7 @@
     <plugin
       filename="ignition-gazebo-odometry-publisher-system"
       name="ignition::gazebo::systems::OdometryPublisher">
-      <topic>model/husky/odometry</topic>
+      <topic>model/parrot/odometry</topic>
       <odom_publish_frequency>20</odom_publish_frequency>
       <odom_frame>odom</odom_frame>
       <robot_base_frame>base_link</robot_base_frame>
@@ -100,7 +100,7 @@
     <plugin
       filename="ignition-gazebo-joint-state-publisher-system"
       name="ignition::gazebo::systems::JointStatePublisher">
-      <topic>model/husky/joint_states</topic>
+      <topic>model/parrot/joint_states</topic>
     </plugin>
   </gazebo>
 
@@ -117,7 +117,7 @@
     <sensor type="gpu_lidar" name="lidar">
       <pose relative_to='base_scan'>0 0 0 0 0 0</pose>
       <visualize>$(arg laser_visual)</visualize>
-      <topic>model/husky/scan</topic>
+      <topic>model/parrot/scan</topic>
       <update_rate>3</update_rate>
       <gz_frame_id>base_scan</gz_frame_id>
       <ray>
@@ -173,7 +173,7 @@
       <always_on>1</always_on>
       <update_rate>3</update_rate> <!--10-->
       <visualize>$(arg camera_visual)</visualize>
-      <topic>/model/husky/camera</topic>
+      <topic>/model/parrot/camera</topic>
       <gz_frame_id>camera_link</gz_frame_id>
     </sensor>
   </gazebo>
