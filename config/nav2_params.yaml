@@ -207,7 +207,7 @@ local_costmap:
         scan:
           topic: /scan
           max_obstacle_height: 2.0
-          clearing: True
+          clearing: false
           marking: True
           data_type: "LaserScan"
           raytrace_max_range: 20.0
@@ -238,7 +238,7 @@ global_costmap:
         scan:
           topic: /scan
           max_obstacle_height: 2.0
-          clearing: True
+          clearing: false
           marking: True
           data_type: "LaserScan"
           raytrace_max_range: 20.0

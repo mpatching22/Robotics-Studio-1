@@ -20,7 +20,7 @@
   direction: GZ_TO_ROS
 
   #ros_topic_name: '/pose'
-- ros_topic_name: '/pose'
+- ros_topic_name: '/drone/pose'
   gz_topic_name: '/model/parrot/pose'
   ros_type_name: 'geometry_msgs/msg/PoseStamped'
   gz_type_name: 'ignition.msgs.Pose'

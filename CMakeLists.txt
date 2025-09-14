@@ -23,7 +23,9 @@ endif()
 # Install Python nodes (executables) into lib/${PROJECT_NAME}
 install(PROGRAMS
   nodes/gui.node.py
+  nodes/flight.control.py 
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 ament_package()

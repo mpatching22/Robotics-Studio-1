@@ -587,6 +587,7 @@ class TwoPaneGUI(QWidget):
 
     def update_status_box(self, status: str):
         mapping = {
+            "Pre Flight Checks": ("PRE-FLIGHT", "#CCCCCC"), # grey
             "Landed":       ("LANDED", "#F06A1A"),   # orange
             "Landing":      ("LANDING", "#C75610"),  # darker orange
             "Taking off":   ("TAKING OFF", "#0C8F24"), # dark green
@@ -678,3 +679,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    

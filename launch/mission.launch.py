@@ -90,7 +90,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '5.0'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '10.0'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -128,12 +128,23 @@ def generate_launch_description():
     )
     ld.add_action(nav2)
 
-    # gui_node = Node(
-    #     package='trailblazer',              # your package name
-    #     executable='gui.node.py',           # the Python entrypoint file
-    #     name='trailblazer_gui',
-    #     output='screen'
-    # )
-    # ld.add_action(gui_node)
+    gui_node = Node(
+        package='trailblazer',              # your package name
+        executable='gui.node.py',           # the Python entrypoint file
+        name='trailblazer_gui',
+        output='screen'
+    )
+    ld.add_action(gui_node)
+
+    flight_control_node = Node(
+        package='trailblazer',
+        executable='flight.control.py',   # must match installed filename
+        name='flight_control',
+        output='screen',
+        parameters=[{
+            'control_rate_hz': 10.0
+        }]
+    )
+    ld.add_action(flight_control_node)
 
     return ld
