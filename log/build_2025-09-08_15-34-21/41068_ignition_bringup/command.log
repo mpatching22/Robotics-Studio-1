@@ -1,4 +1,0 @@
-Invoking command in '/home/mpatching/41068_ws/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/mpatching/41068_ws/build/41068_ignition_bringup -- -j22 -l22
-Invoked command in '/home/mpatching/41068_ws/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/mpatching/41068_ws/build/41068_ignition_bringup -- -j22 -l22
-Invoking command in '/home/mpatching/41068_ws/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/mpatching/41068_ws/build/41068_ignition_bringup
-Invoked command in '/home/mpatching/41068_ws/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/mpatching/41068_ws/build/41068_ignition_bringup

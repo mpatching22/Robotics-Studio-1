@@ -1,9 +1,0 @@
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/uninstall.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/41068_ignition_bringup_uninstall.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/test.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/edit_cache.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/rebuild_cache.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/list_install_components.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/install.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/install/local.dir
-/home/mpatching/41068_ws/build/41068_ignition_bringup/CMakeFiles/install/strip.dir

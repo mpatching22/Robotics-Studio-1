@@ -1,1 +1,0 @@
-/home/mpatching/41068_ws/src/41068_ignition_bringup/launch/41068_navigation.launch.py
