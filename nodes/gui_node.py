@@ -49,11 +49,14 @@ class GuiNode(Node):
         self.pub_goal   = self.create_publisher(PointStamped, '/cmd/goal', 10)
         self.pub_height = self.create_publisher(Float32, '/cmd/height', 10)
 
-        # NEW: pose + camera subscribers
-        self.sub_pose_pcs = self.create_subscription(PoseWithCovarianceStamped, '/pose', self.pose_callback_pcs, 10)
-        self.bridge = CvBridge()
-        self.sub_cam = self.create_subscription(Image, '/camera/image', self.camera_cb, 10) 
+        # NEW: pose + camera subscribers - taken out due to lag
+        # self.bridge = CvBridge()
+        # self.sub_cam = self.create_subscription(Image, '/camera/image', self.camera_cb, 10) 
 
+        self.sub_pose_ps = self.create_subscription(
+            PoseStamped, '/drone/pose_1hz', self.pose_callback_ps, 10
+        )
+                
         self.sub_goal_dist = self.create_subscription(
             Float32, '/goal/distance', self.goal_dist_cb, 10
         )
@@ -594,6 +597,7 @@ class TwoPaneGUI(QWidget):
             "Halted":       ("HALTED", "#D9C40A"),   # yellow
             "Moving to goal": ("MOVING TO GOAL", "#64B32D"), # light green
             "Arrived at goal": ("ARRIVED AT GOAL", "#1A73E8"), # blue
+            "Emergency Landing": ("EMERGENCY LANDING", "#CF1C12"), # 🔴 red
         }
 
         text, color = mapping.get(status, (status.upper(), "#CCCCCC"))
@@ -602,6 +606,7 @@ class TwoPaneGUI(QWidget):
         self.status_box.setStyleSheet(
             f"#statusBoxGeneric {{ border: 2px solid #333333; border-radius: 4px; background: {color}; }}"
         )
+
     
     def update_goal_position(self, x: float, y: float, z: float):
         # show the current goal in the Enter Goal fields (still editable)

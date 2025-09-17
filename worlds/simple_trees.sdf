@@ -51,22 +51,27 @@
       <pose>0 0 0 0 0 0</pose>
     </include>
 
-    <!-- Oak tree 
-    <include>
+    <!-- Oak tree -->
+    <!-- <include>
       <uri>
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
       </uri>
       <name>oak1</name>
       <pose>0 3.0 0 0 0 0</pose>
-    </include>
+    </include> -->
     
-     Pine tree
-    <include>
+    <!-- Pine tree -->
+    <!-- <include>
       <uri>
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
       </uri>
       <name>pine1</name>
-      <pose>5.0 0.0 0 0 0 0</pose>
+      <pose>3.0 0.0 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://boulder</uri>
+      <pose>10.25 0 0.5 0 0 0</pose>
     </include> -->
 
   </world>

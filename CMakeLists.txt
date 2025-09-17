@@ -22,8 +22,8 @@ endif()
 
 # Install Python nodes (executables) into lib/${PROJECT_NAME}
 install(PROGRAMS
-  nodes/gui.node.py
-  nodes/flight.control.py 
+  nodes/gui_node.py
+  nodes/flight_control.py 
   nodes/pose_relay.py
   DESTINATION lib/${PROJECT_NAME}
 )

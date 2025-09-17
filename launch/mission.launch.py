@@ -68,19 +68,21 @@ def generate_launch_description():
     # Start Gazebo to simulate the robot in the chosen world
     world_launch_arg = DeclareLaunchArgument(
         'world',
-        default_value='simple_trees',
-        description='Which world to load',
-        choices=['simple_trees', 'large_demo']
+        default_value='simple_trees.sdf',
+        choices=['simple_trees.sdf', 'large_demo.sdf'],
+        description='Which world to load'
     )
     ld.add_action(world_launch_arg)
+
     gazebo = IncludeLaunchDescription(
         PathJoinSubstitution([FindPackageShare('ros_ign_gazebo'),
-                             'launch', 'ign_gazebo.launch.py']),
+                            'launch', 'ign_gazebo.launch.py']),
         launch_arguments={
-            'ign_args': [PathJoinSubstitution([pkg_path,
-                                               'worlds',
-                                               [LaunchConfiguration('world'), '.sdf']]),
-                         ' -r']}.items()
+            'ign_args': [
+                PathJoinSubstitution([pkg_path, 'worlds', LaunchConfiguration('world')]),
+                ' -r'
+            ]
+        }.items()
     )
     ld.add_action(gazebo)
 
@@ -90,7 +92,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '2.0'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '1.0'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -144,8 +146,8 @@ def generate_launch_description():
     ld.add_action(pose_relay)
 
     gui_node = Node(
-        package='trailblazer',              # your package name
-        executable='gui.node.py',           # the Python entrypoint file
+        package='trailblazer',
+        executable='gui_node.py',    
         name='trailblazer_gui',
         output='screen'
     )
@@ -153,7 +155,7 @@ def generate_launch_description():
 
     flight_control_node = Node(
         package='trailblazer',
-        executable='flight.control.py',   # must match installed filename
+        executable='flight_control.py',   # must match installed filename
         name='flight_control',
         output='screen',
         parameters=[{
