@@ -7,7 +7,7 @@ Launch the drone
     ros2 launch trailblazer mission.launch.py
 
 With SLAM + Navigation + RViz + small demo 
-    ros2 launch trailblazer mission.launch.py slam:=true nav2:=true rviz:=true world:=large_demo gui:=true
+    ros2 launch trailblazer mission.launch.py slam:=true nav2:=true rviz:=true world:=simple_trees gui:=true
 
 Simple demo with GUI
     ros2 launch trailblazer mission.launch.py world:=simple_trees gui:=true
@@ -37,3 +37,5 @@ Extra's
     To kill stray gazebo instances
         ps aux | grep -E "ign|gz" | grep -v grep
         kill 223753 223755   # or:  pkill -f ros_gz_bridge
+
+        ign topic -e -t /world/simple_trees/pose/info -n 1

@@ -90,7 +90,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '10.0'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '2.0'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -127,6 +127,21 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('nav2'))
     )
     ld.add_action(nav2)
+
+    pose_relay = Node(
+        package='trailblazer',
+        executable='pose_relay.py',
+        name='pose_relay',
+        output='screen',
+        parameters=[{
+            'source_topic': '/odometry',     # or '/odometry'
+            'source_type': 'odom',             # 'odom' if using /odometry
+            'output_topic': '/drone/pose_1hz',
+            'point_topic': '/drone/position',
+            'rate_hz': 1.0
+        }]
+    )
+    ld.add_action(pose_relay)
 
     gui_node = Node(
         package='trailblazer',              # your package name

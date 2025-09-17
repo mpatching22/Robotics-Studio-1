@@ -24,8 +24,8 @@ endif()
 install(PROGRAMS
   nodes/gui.node.py
   nodes/flight.control.py 
+  nodes/pose_relay.py
   DESTINATION lib/${PROJECT_NAME}
 )
-
 
 ament_package()
