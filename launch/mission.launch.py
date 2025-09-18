@@ -164,4 +164,22 @@ def generate_launch_description():
     )
     ld.add_action(flight_control_node)
 
+    altitude_mixer_node = Node(
+        package='trailblazer',
+        executable='altitude_mixer.py',
+        name='altitude_mixer',
+        output='screen',
+        parameters=[{
+            'rate_hz': 20.0,
+            'kp_z': 1.2,
+            'kd_z': 0.8,
+            'max_up': 1.5,
+            'max_down': 1.0,
+            'deadband': 0.05,
+            'use_odom': True
+        }]
+    )
+    ld.add_action(altitude_mixer_node)
+
+
     return ld

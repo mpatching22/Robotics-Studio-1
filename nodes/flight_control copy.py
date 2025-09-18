@@ -33,9 +33,6 @@ class FlightControl(Node):
         super().__init__('flight_control')
         self.get_logger().info("Flight Control Node Started")
 
-        self.declare_parameter('nav2_mode', True)
-        self.nav2_mode = bool(self.get_parameter('nav2_mode').value)
-
         # --- Publishers ---
         self.pub_status  = self.create_publisher(String, '/movement/status', 10)
         self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)  # not used yet, reserved
@@ -173,28 +170,22 @@ class FlightControl(Node):
     def taking_off(self):
         # Need pose and Z
         if self.currentZ is None:
-            # Do not publish zero twist in nav2_mode; mixer handles thrust
-            if not self.nav2_mode:
-                self.zero_twist()
+            self.zero_twist()
             return
 
-        # target height (GUI-set or default 2.0 m)
+        # choose target height (GUI-set or default 2.0 m)
         tgt = self.target_height if self.target_height is not None else 2.0
+
+        # error = target - current (positive means 'go up')
         z_err = float(tgt - self.currentZ)
 
-        # within tolerance? switch to Halted (ready for Nav2 to move XY)
+        # within tolerance? stop and switch to Halted
         if abs(z_err) <= self.heightTolerance:
-            if not self.nav2_mode:
-                self.zero_twist()
+            self.zero_twist()
             self.set_status("Halted")
             return
 
-        # In nav2_mode, DO NOT command /cmd_vel. The altitude_mixer will act
-        # on /cmd/height and push vertical thrust smoothly.
-        if self.nav2_mode:
-            return
-
-        # Legacy/manual fallback if nav2_mode=False:
+        # proportional control on Z, only ascend in takeoff
         vz = self.kp_z * z_err
         if vz < 0.0:
             vz = 0.0
@@ -204,7 +195,6 @@ class FlightControl(Node):
         cmd = Twist()
         cmd.linear.z = vz
         self.pub_cmd_vel.publish(cmd)
-
 
     def landing(self):
         self.set_status("Landing")
@@ -249,9 +239,6 @@ class FlightControl(Node):
         # self.get_logger().debug(f"pose: x={self.currentX:.2f} y={self.currentY:.2f} z={self.currentZ:.2f}")
 
     def zero_twist(self):
-        # In Nav2 mode, altitude_mixer owns /cmd_vel. Do not publish.
-        if getattr(self, 'nav2_mode', False):
-            return
         self.pub_cmd_vel.publish(Twist())
 
     def clamp(self, v, lo, hi):

@@ -36,6 +36,8 @@ class GuiNode(Node):
 
         # Single publisher
         self.pub_cmd = self.create_publisher(String, '/cmd/control', 10)
+
+        self.pub_nav_goal = self.create_publisher(PoseStamped, '/goal_pose', 10)
         
         # Subscriber to movement status
         self.sub_status = self.create_subscription(
@@ -123,6 +125,19 @@ class GuiNode(Node):
     def publish_height(self, h: float):
         self.pub_height.publish(Float32(data=float(h)))
         self.get_logger().info(f"Published /cmd/height: {h}")
+
+
+    def publish_nav2_goal(self, x: float, y: float, z: float):
+        goal = PoseStamped()
+        goal.header.stamp = self.get_clock().now().to_msg()
+        goal.header.frame_id = 'map'      # Nav2 expects map or global frame
+        goal.pose.position.x = float(x)
+        goal.pose.position.y = float(y)
+        goal.pose.position.z = float(z)
+        goal.pose.orientation.w = 1.0     # facing irrelevant for a drone; set identity
+        self.pub_nav_goal.publish(goal)
+        self.get_logger().info(f"Published /goal_pose (Nav2): ({x}, {y}, {z})")
+
     
 class TwoPaneGUI(QWidget):
     status_signal = Signal(str)   # <--- Qt signal carrying status text
@@ -564,13 +579,21 @@ class TwoPaneGUI(QWidget):
             z = float(self.goal_z_edit.text())
         except ValueError:
             return
-        # publish to /cmd/goal via your ROS node
+
+        # Keep your original app topic (for your FC UI/state)
         self.ros_node.publish_goal(x, y, z)
 
-        # reflect locally so the Enter Goal fields keep the commanded values
+        # New: actually drive Nav2 XY via /goal_pose
+        self.ros_node.publish_nav2_goal(x, y, z)
+
+        # New: set Z target for the altitude mixer
+        self.ros_node.publish_height(z)
+
+        # reflect back in the boxes
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
         self.goal_z_edit.setText(f"{z:.2f}")
+
 
     def set_height(self):
         try:
