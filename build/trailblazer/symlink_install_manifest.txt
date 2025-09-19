@@ -25,6 +25,7 @@
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/worlds/large_demo.sdf
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/worlds/simple_trees.sdf
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/common_properties.urdf.xacro
+/home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/hokuyo.urdf.xacro
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/meshes/hull.dae
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fl.dae
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fr.dae
@@ -40,7 +41,9 @@
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/4.png
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/5.png
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/hull.dae
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/lidar_perception_360.py
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/pose_relay.py
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/climb_controller.py
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/package_run_dependencies/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/parent_prefix_path/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/environment/ament_prefix_path.sh

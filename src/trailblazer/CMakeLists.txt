@@ -20,11 +20,13 @@ install(
 #   ament_lint_auto_find_test_dependencies()
 # endif()
 
-# Install Python executables (this creates install/trailblazer/lib/trailblazer)
 install(PROGRAMS
+  nodes/lidar_perception_360.py
   nodes/pose_relay.py
+  nodes/climb_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 # # Install Python nodes (executables) into lib/${PROJECT_NAME}
 # install(PROGRAMS

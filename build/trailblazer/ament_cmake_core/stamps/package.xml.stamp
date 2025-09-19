@@ -25,4 +25,11 @@
     <gazebo_ros gazebo_model_path="${prefix}/models"/>
     <gazebo_ros gazebo_media_path="${prefix}/worlds"/>
   </export>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+
+
 </package>
