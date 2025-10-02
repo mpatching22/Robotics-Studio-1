@@ -24,6 +24,7 @@ install(PROGRAMS
   nodes/lidar_perception_360.py
   nodes/pose_relay.py
   nodes/climb_controller.py
+  nodes/forward_10m_cli.py       # <-- add this line
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -1,1 +1,1 @@
-rclpy:robot_localization:ros_ign_bridge:ros_ign_gazebo:ros_ign_interfaces:sensor_msgs:std_msgs:visualization_msgs
+geometry_msgs:nav2_bringup:nav2_msgs:nav2_simple_commander:rclpy:robot_localization:ros_ign_bridge:ros_ign_gazebo:ros_ign_interfaces:sensor_msgs:std_msgs:visualization_msgs

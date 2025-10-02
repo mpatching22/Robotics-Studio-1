@@ -4,8 +4,8 @@
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/robot_localization.yaml
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/slam_params.yaml
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/launch/41068_ignition.launch.py
-/home/mpatching/41068_ws/install/trailblazer/share/trailblazer/launch/41068_navigation.launch.py
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/launch/mission.launch.py
+/home/mpatching/41068_ws/install/trailblazer/share/trailblazer/launch/navigation.launch.py
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/launch/pine_tree_detection.launch.py
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/models/boulder/boulder.sdf
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/models/boulder/model.config
@@ -44,6 +44,7 @@
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/lidar_perception_360.py
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/pose_relay.py
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/climb_controller.py
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/forward_10m_cli.py
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/package_run_dependencies/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/parent_prefix_path/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/environment/ament_prefix_path.sh

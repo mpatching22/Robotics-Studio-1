@@ -151,36 +151,46 @@ def generate_launch_description():
     )
     ld.add_action(pose_relay)
 
-    climb_controller = Node(
-        package='trailblazer',
-        executable='climb_controller.py',
-        name='climb_controller',
+    amcl = Node(
+        package='nav2_amcl',
+        executable='amcl',
+        name='amcl',
         output='screen',
-        parameters=[{
-            'pose_topic': '/drone/pose_1hz',  # Use 1Hz pose from relay
-            'msg_type': 'pose',               # PoseStamped messages
-            'speed_mps': 0.1,                 # 0.1 m/s climb rate
-            'target_z': 15.0,                 # Climb to 15m 
-            'publish_rate_hz': 10.0,          # 10Hz command rate
-            'timeout_sec': 3.0                # 3s timeout for pose data
-        }]
+        parameters=[PathJoinSubstitution([config_path, 'nav2_params.yaml']),
+                    {'use_sim_time': use_sim_time}]
     )
-    ld.add_action(climb_controller)       
+    ld.add_action(amcl)
 
-    perception = Node(
-        package='trailblazer',
-        executable='lidar_perception_360.py',
-        name='lidar_perception_360',
-        output='screen',
-        parameters=[{
-            'scan_topic': '/scan',
-            'num_sectors': 8,
-            'front_sector_deg': 30.0,
-            'min_obs_dist': 3.0,
-            'use_sim_time': use_sim_time
-        }]
-    )
-    ld.add_action(perception)
+    # climb_controller = Node(
+    #     package='trailblazer',
+    #     executable='climb_controller.py',
+    #     name='climb_controller',
+    #     output='screen',
+    #     parameters=[{
+    #         'pose_topic': '/drone/pose_1hz',  # Use 1Hz pose from relay
+    #         'msg_type': 'pose',               # PoseStamped messages
+    #         'speed_mps': 0.1,                 # 0.1 m/s climb rate
+    #         'target_z': 15.0,                 # Climb to 15m 
+    #         'publish_rate_hz': 10.0,          # 10Hz command rate
+    #         'timeout_sec': 3.0                # 3s timeout for pose data
+    #     }]
+    # )
+    # ld.add_action(climb_controller)       
+
+    # perception = Node(
+    #     package='trailblazer',
+    #     executable='lidar_perception_360.py',
+    #     name='lidar_perception_360',
+    #     output='screen',
+    #     parameters=[{
+    #         'scan_topic': '/scan',
+    #         'num_sectors': 8,
+    #         'front_sector_deg': 30.0,
+    #         'min_obs_dist': 3.0,
+    #         'use_sim_time': use_sim_time
+    #     }]
+    # )
+    # ld.add_action(perception)
                                                                                       
 
     # gui_node = Node(
