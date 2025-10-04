@@ -12,7 +12,7 @@ class PoseRelay(Node):
         super().__init__('pose_relay')
 
         # Parameters
-        self.declare_parameter('source_topic', '/drone/pose')   # or '/odometry'
+        self.declare_parameter('source_topic', '/odometry')   # or '/odometry'
         self.declare_parameter('output_topic', '/drone/pose_1hz')
         self.declare_parameter('point_topic',  '/drone/position')
         self.declare_parameter('rate_hz', 1.0)

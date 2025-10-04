@@ -1,5 +1,6 @@
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/41068.rviz
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/gazebo_bridge.yaml
+/home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/nav2_minimal.yaml
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/nav2_params.yaml
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/robot_localization.yaml
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/config/slam_params.yaml
@@ -45,6 +46,9 @@
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/pose_relay.py
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/climb_controller.py
 /home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/forward_10m_cli.py
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/minimal_drone_nav.py
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/altitude_mixer.py
+/home/mpatching/41068_ws/install/trailblazer/lib/trailblazer/waypoint_planner.py
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/package_run_dependencies/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/ament_index/resource_index/parent_prefix_path/trailblazer
 /home/mpatching/41068_ws/install/trailblazer/share/trailblazer/environment/ament_prefix_path.sh

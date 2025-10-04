@@ -24,9 +24,13 @@ install(PROGRAMS
   nodes/lidar_perception_360.py
   nodes/pose_relay.py
   nodes/climb_controller.py
-  nodes/forward_10m_cli.py       # <-- add this line
+  nodes/forward_10m_cli.py
+  nodes/minimal_drone_nav.py
+  nodes/altitude_mixer.py     
+  nodes/waypoint_planner.py      # <--- add this line
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 
 # # Install Python nodes (executables) into lib/${PROJECT_NAME}

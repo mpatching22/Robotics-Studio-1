@@ -1,45 +1,40 @@
-
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
-
+from launch_ros.actions import Node
 
 def generate_launch_description():
+    params = ['/path/to/nav2_params.yaml']  # <-- your edited yaml
 
-    ld = LaunchDescription()
+    planner = Node(
+        package='nav2_planner', executable='planner_server', output='screen',
+        parameters=params)
+    controller = Node(
+        package='nav2_controller', executable='controller_server', output='screen',
+        parameters=params)
+    smoother = Node(
+        package='nav2_smoother', executable='smoother_server', output='screen',
+        parameters=params)
+    behavior = Node(
+        package='nav2_behaviors', executable='behavior_server', output='screen',
+        parameters=params)
+    bt_nav = Node(
+        package='nav2_bt_navigator', executable='bt_navigator', output='screen',
+        parameters=params)
 
-    config_path = PathJoinSubstitution([FindPackageShare('trailblazer'), 'config'])
+    # This is the critical piece: it activates all lifecycle Nav2 servers
+    lifecycle = Node(
+        package='nav2_lifecycle_manager', executable='lifecycle_manager', output='screen',
+        name='lifecycle_manager_navigation',
+        parameters=[{
+            'use_sim_time': True,
+            'autostart': True,
+            'bond_timeout': 0.0,
+            'node_names': [
+                'controller_server',
+                'planner_server',
+                'smoother_server',
+                'behavior_server',
+                'bt_navigator'
+            ],
+        }])
 
-    # Additional command line arguments
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    use_sim_time_launch_arg = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='True',
-        description='Flag to enable use_sim_time'
-    )
-
-    # Start Simultaneous Localisation and Mapping (SLaM)
-    slam = IncludeLaunchDescription(
-        PathJoinSubstitution([FindPackageShare('slam_toolbox'),
-                             'launch', 'online_async_launch.py']),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'slam_params_file': PathJoinSubstitution([config_path, 'slam_params.yaml'])
-        }.items()
-    )
-
-    # Start Navigation Stack
-    navigation = IncludeLaunchDescription(
-        PathJoinSubstitution([FindPackageShare('nav2_bringup'), 'launch', 'navigation_launch.py']),
-        launch_arguments={
-            'use_sim_time': use_sim_time,
-            'params_file': PathJoinSubstitution([config_path, 'nav2_params.yaml'])
-        }.items()
-    )
-
-    ld.add_action(use_sim_time_launch_arg)
-    ld.add_action(slam)
-    ld.add_action(navigation)
-
-    return ld
+    return LaunchDescription([planner, controller, smoother, behavior, bt_nav, lifecycle])
