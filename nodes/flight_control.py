@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
+import math
 import rclpy
 from rclpy.node import Node
+from rclpy.duration import Duration
 
 from std_msgs.msg import String, Float32
-from geometry_msgs.msg import PoseStamped, PointStamped
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseStamped, PointStamped, Twist
+from nav_msgs.msg import Odometry
 
 GUI_TO_CMD = {
-    "HALT": "halt",
+    "HOVER": "hover",
     "MOVE TO GOAL": "move_to_goal",
     "LAND": "land",
     "TAKEOFF": "takeoff",
@@ -17,16 +19,15 @@ GUI_TO_CMD = {
 STATUSES = [
     "Pre Flight Checks",
     "Landed",
-    "Halted",
+    "Hovering",
     "Arrived at Goal",
 
     "Taking off",
     "Landing",
-    "Halting",
+    "Hovering",
     "Moving to Goal",
     "Emergency Landing",
 ]
-
 
 class FlightControl(Node):
     def __init__(self):
@@ -35,70 +36,128 @@ class FlightControl(Node):
 
         # --- Publishers ---
         self.pub_status  = self.create_publisher(String, '/movement/status', 10)
-        self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)  # not used yet, reserved
+        self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.pub_goal_dist = self.create_publisher(Float32, '/goal/distance', 10)
+        self.pub_goal_time = self.create_publisher(Float32, '/goal/time', 10)
 
-        # --- Subscribers (listen to GUI + pose) ---
-        self.sub_cmd   = self.create_subscription(String, '/cmd/control', self.on_cmd, 10)
-        self.sub_goal  = self.create_subscription(PointStamped, '/cmd/goal', self.on_goal, 10)
 
-        # use the callbacks you actually defined below
-        self.sub_height = self.create_subscription(Float32, '/cmd/height', self.sub_height, 10)
-        self.sub_pose   = self.create_subscription(PoseStamped, '/drone/pose_1hz', self.sub_pose, 10)
+        # --- Parameters (defaults; overridable from launch) ---
+        self.declare_parameter('control_rate_hz', 20.0)
+        self.declare_parameter('max_xy_speed',   1.5)
+        self.declare_parameter('max_z_up',       2.0)
+        self.declare_parameter('max_z_down',     1.0)
+        self.declare_parameter('kp_xy',          0.8)
+        self.declare_parameter('kp_z',           0.65)
+        self.declare_parameter('ki_z',           0.20)
+        self.declare_parameter('pos_tol_xy',     0.25)
+        self.declare_parameter('pos_tol_z',      0.15)
+
+        # Read params
+        self.ctrl_hz      = float(self.get_parameter('control_rate_hz').value)
+        self.max_xy_speed = float(self.get_parameter('max_xy_speed').value)
+        self.max_z_up     = float(self.get_parameter('max_z_up').value)
+        self.max_z_down   = float(self.get_parameter('max_z_down').value)
+        self.kp_xy        = float(self.get_parameter('kp_xy').value)
+        self.kp_z         = float(self.get_parameter('kp_z').value)
+        self.ki_z         = float(self.get_parameter('ki_z').value)
+        self.pos_tol_xy   = float(self.get_parameter('pos_tol_xy').value)
+        self.pos_tol_z    = float(self.get_parameter('pos_tol_z').value)
+
+        # --- Subscribers ---
+        self.sub_cmd      = self.create_subscription(String,       '/cmd/control',   self.on_cmd,   10)
+        self.sub_goal     = self.create_subscription(PointStamped, '/cmd/goal',      self.on_goal,  10)
+        self.sub_height_s = self.create_subscription(Float32,      '/cmd/height',    self.on_height,10)
+        self.sub_pose_s   = self.create_subscription(PoseStamped,  '/drone/pose_1hz',self.on_pose,  10)
+
+        self.velX = self.velY = self.velZ = None  # measured (or filtered) velocities
+        self.k_brake_xy      = 1.25               # how hard to counter-brake (cmd vel per m/s)
+        self.stop_speed_xy   = 0.05               # when |v| < this, command 0 precisely
+        self.max_brake_speed = 1.5                # clamp for safety
+
+        # Subscribe to filtered odometry (preferred). If you don’t have this, use /odometry.
+        self.sub_odom = self.create_subscription(Odometry, '/odometry/filtered', self.on_odom, 10)
+
 
         # --- Internal state ---
-        self.cmd = 'pre-flight'
-        self.goal_xyz = None
-        self.target_height = None
-        self._last_status = None
-        self.current_pose = None
+        self.status          = "Pre Flight Checks"
+        self._last_status    = None
+        self.last_cmd        = None
 
-        # main loop (just relays status for now)
-        self.timer = self.create_timer(0.2, self.main_loop)  # 5 Hz is fine for status relay
+        self.target_height   = None
+        self.goal_xyz        = None
+        self.hover_z = None  # Z setpoint captured when HOVER is pressed
 
-        # publish initial status so GUI leaves "CONNECTING..."
+        self.current_pose    = None
+        self.currentX        = None
+        self.currentY        = None
+        self.currentZ        = None
 
-        self.currentX = None
-        self.currentY = None
-        self.currentZ = None
+        # Z PI controller state
+        self._int_z          = 0.0
+        self._int_z_max      = 1.0  # limit on integral *contribution* (anti-windup)
+        self._last_ctrl_time = self.get_clock().now()
 
-        self.preFlightChecks = False
+        # Timer (main loop)
+        self.timer = self.create_timer(1.0 / max(1.0, self.ctrl_hz), self.main_loop)
 
-        self.heightTolerance = 0.5
+        # Publish initial status so GUI leaves "CONNECTING..."
+        self.set_status(self.status)
 
-        self.kp_z = 1.2
-        self.max_up_speed = 2.0
+    # ----------------- Utilities -----------------
+    def clamp(self, x, lo, hi):
+        return lo if x < lo else hi if x > hi else x
 
-        self.lastCommand = None
-        self.takeOffSet = False
-        self.goalSet = False
-        self.preFlightChecks = True   # or False; set how you need
+    def set_status(self, s: str):
+        if s != self._last_status:
+            self._last_status = s
+            self.status = s
+            msg = String()
+            msg.data = s
+            self.pub_status.publish(msg)
+            self.get_logger().info(f"Status: {s}")
 
-        self.status = "Pre Flight Checks"
+    def zero_twist(self):
+        self.pub_cmd_vel.publish(Twist())
 
-    # ----------------- Callbacks -----------------
     def on_cmd(self, msg: String):
         text = msg.data.strip().upper()
         self.get_logger().info(f"/cmd/control: {text}")
         if text in GUI_TO_CMD:
-            self.cmd = GUI_TO_CMD[text]
+            self.last_cmd = GUI_TO_CMD[text]
         else:
-            self.cmd = text.lower()
-        self.lastCommand = self.cmd
-        # optional immediate status switch for clarity:
-        if self.cmd == 'takeoff':
+            self.last_cmd = text.lower()
+
+        if self.last_cmd == 'takeoff':
+            self.hover_z = None
             self.set_status('Taking off')
-        elif self.cmd == 'land':
+
+        elif self.last_cmd == 'move_to_goal':
+            # switching intent; drop any hover target
+            self.hover_z = None
+            if self.currentZ is not None and self.currentZ > 0.3:
+                self.set_status('Moving to Goal')
+            else:
+                self.set_status('Taking off')
+
+        elif self.last_cmd == 'land':
+            self.hover_z = None
             self.set_status('Landing')
-        elif self.cmd == 'halt':
-            self.set_status('Halted')
-        elif self.cmd == 'move_to_goal':
-            self.set_status('Moving to Goal')
-        elif self.cmd == 'emergency_land':
+
+        elif self.last_cmd == 'hover':
+            # Override any previously set height:
+            self.target_height = None
+            # Snapshot the current altitude as the hover setpoint (or capture later on first pose)
+            self.hover_z = float(self.currentZ) if self.currentZ is not None else None
+            self.set_status('Hovering')
+
+        elif self.last_cmd == 'emergency_land':
+            self.hover_z = None
             self.set_status('Emergency Landing')
 
 
     def on_goal(self, msg: PointStamped):
         self.goal_xyz = (float(msg.point.x), float(msg.point.y), float(msg.point.z))
+        self._update_goal_metrics()
         self.get_logger().info(f"/cmd/goal: {self.goal_xyz}")
 
     def on_height(self, msg: Float32):
@@ -107,143 +166,236 @@ class FlightControl(Node):
 
     def on_pose(self, msg: PoseStamped):
         self.current_pose = msg.pose
-        # keep logs light; flip to info if you want to see it
-        self.get_logger().debug(
-            f"pose_1hz x={msg.pose.position.x:.2f} y={msg.pose.position.y:.2f} z={msg.pose.position.z:.2f}"
-        )
+        self.currentX = float(msg.pose.position.x)
+        self.currentY = float(msg.pose.position.y)
+        self.currentZ = float(msg.pose.position.z)
 
-    # ----------------- State relay only -----------------
+        # If HOVER was requested but we hadn't captured Z yet, snapshot once now.
+        if self.last_cmd == 'hover' and self.hover_z is None and self.currentZ is not None:
+            self.hover_z = float(self.currentZ)
+
+
+    # ----------------- Core controllers -----------------
+    def _vz_hold(self, target_z: float) -> float:
+        """
+        PI controller for altitude hold. Returns a vz command.
+        """
+        if self.currentZ is None:
+            return 0.0
+
+        now = self.get_clock().now()
+        dt = (now - self._last_ctrl_time).nanoseconds / 1e9
+        if dt <= 0.0 or dt > 1.0:  # guard dt if clocks jump
+            dt = 1.0 / self.ctrl_hz
+        self._last_ctrl_time = now
+
+        e = float(target_z - self.currentZ)
+
+        # Integral with anti-windup via clamped contribution
+        self._int_z += e * dt
+        if self.ki_z > 0.0:
+            max_i = self._int_z_max / self.ki_z
+            self._int_z = self.clamp(self._int_z, -max_i, max_i)
+
+        vz = self.kp_z * e + self.ki_z * self._int_z
+
+        # Ascent/descent limits (gentler down)
+        if vz >= 0.0:
+            vz = self.clamp(vz, 0.0, self.max_z_up)
+        else:
+            vz = self.clamp(vz, -self.max_z_down, 0.0)
+        return float(vz)
+
+    def _cmd_vel(self, vx: float, vy: float, vz: float):
+        tw = Twist()
+        tw.linear.x = float(self.clamp(vx, -self.max_xy_speed, self.max_xy_speed))
+        tw.linear.y = float(self.clamp(vy, -self.max_xy_speed, self.max_xy_speed))
+        # vz already limited in _vz_hold
+        tw.linear.z = float(vz)
+        self.pub_cmd_vel.publish(tw)
+
+    # ----------------- States -----------------
     def main_loop(self):
-        # Map command keyword -> outward-facing status expected by GUI
+        # Ensure we always publish something sensible for Z each tick to prevent sag.
         if self.status == 'Pre Flight Checks':
             self.pre_flight_checks()
         elif self.status == 'Landed':
             self.landed()
-        elif self.status == 'Halted':
-            self.halted()
         elif self.status == 'Arrived at Goal':
             self.arrived_at_goal()
-
         elif self.status == 'Taking off':
             self.taking_off()
         elif self.status == 'Landing':
             self.landing()
-        elif self.status == 'Halting':
-            self.halting()
+        elif self.status == 'Hovering':
+            self.hovering()
         elif self.status == 'Moving to Goal':
             self.moving_to_goal()
         elif self.status == 'Emergency Landing':
             self.emergency_landing()
         else:
-            # Unknown/idle: stay in pre-flight to avoid confusion
-            self.set_status("Pre Flight Checks")
-                        
+            self.set_status("Pre Flight Checks" )
+
     def pre_flight_checks(self):
+        # Minimal pre-flight for now
         self.set_status("Pre Flight Checks")
-        if self.preFlightChecks:
-            self.set_status("Landed")
-        else:
-            self.goalSet = False
-            self.takeOffSet = False
-            self.height_difference = None
-            self.targetHeight = 5
+        # Drop straight to Landed once we have pose
+        if self.currentZ is not None:
             self.set_status("Landed")
 
     def landed(self):
-        if self.lastCommand == 'takeoff':
+        # Motors stopped; wait for commands
+        self.zero_twist()
+        if self.last_cmd == 'takeoff':
             self.set_status('Taking off')
-        elif self.lastCommand == 'move_to_goal':
+        elif self.last_cmd == 'move_to_goal':
             self.set_status('Taking off')
-        else:
-            return
 
-    def halted(self):
-        self.set_status("Halted")
-        if self.takeOffSet:
-            self.set_status("Taking off")
-        else:
-            return
-        
+
     def arrived_at_goal(self):
-        self.set_status("Arrived at Goal")
+        # Park at goal height (if set) or current height
+        gz = self.goal_xyz[2] if self.goal_xyz is not None else (self.currentZ or 0.0)
+        vz = self._vz_hold(gz)
+        self._cmd_vel(0.0, 0.0, vz)
+
+        if self.last_cmd == 'land':
+            self.set_status('Landing')
 
     def taking_off(self):
-        # Need pose and Z
+        # Pick a sensible default if GUI hasn't sent a height
+        tgt = self.target_height if self.target_height is not None else 2.0
+
+        if self.currentZ is None:
+            # no pose yet; keep publishing nothing aggressive
+            self.zero_twist()
+            return
+
+        # Close enough? park and decide next state
+        if abs(tgt - self.currentZ) <= self.pos_tol_z:
+            if self.last_cmd == 'move_to_goal' and self.goal_xyz is not None:
+                self.set_status('Moving to Goal')
+            else:
+                self.set_status('Hovering')
+            # keep holding altitude no matter what
+            vz = self._vz_hold(tgt)
+            self._cmd_vel(0.0, 0.0, vz)
+            return
+
+        # Otherwise, rise/descend toward target and KEEP thrust applied
+        vz = self._vz_hold(tgt)
+        self._cmd_vel(0.0, 0.0, vz)
+
+    def moving_to_goal(self):
+        if self.currentX is None or self.goal_xyz is None:
+            # Nothing to do yet; hold current/target height to avoid sag
+            tgt = self.target_height if self.target_height is not None else (self.currentZ or 0.0)
+            vz = self._vz_hold(tgt)
+            self._cmd_vel(0.0, 0.0, vz)
+            return
+
+        gx, gy, gz = self.goal_xyz
+        ex = gx - self.currentX
+        ey = gy - self.currentY
+        ez = gz - (self.currentZ if self.currentZ is not None else gz)
+
+        # Arrival check
+        if abs(ex) <= self.pos_tol_xy and abs(ey) <= self.pos_tol_xy and abs(ez) <= self.pos_tol_z:
+            self.set_status('Arrived at Goal')
+            # Publish distance (meters)
+            self.pub_goal_dist.publish(Float32(data=0.0))
+
+            # Publish time as simply distance * 2 (seconds)
+            self.pub_goal_time.publish(Float32(data=0.0))
+            # keep holding goal altitude
+            vz = self._vz_hold(gz)
+            self._cmd_vel(0.0, 0.0, vz)
+            return
+
+        # XY proportional control
+        vx = self.kp_xy * ex
+        vy = self.kp_xy * ey
+
+        # Z via PI hold to goal.z
+        vz = self._vz_hold(gz)
+
+        self._cmd_vel(vx, vy, vz)
+        self._update_goal_metrics()
+
+    def landing(self):
+        # Descend toward a small near-ground height (e.g., 0.10 m)
+        land_z = 0.10
+
         if self.currentZ is None:
             self.zero_twist()
             return
 
-        # choose target height (GUI-set or default 2.0 m)
-        tgt = self.target_height if self.target_height is not None else 2.0
-
-        # error = target - current (positive means 'go up')
-        z_err = float(tgt - self.currentZ)
-
-        # within tolerance? stop and switch to Halted
-        if abs(z_err) <= self.heightTolerance:
+        if self.currentZ <= (land_z + self.pos_tol_z):
+            # Touchdown
             self.zero_twist()
-            self.set_status("Halted")
+            self.set_status('Landed')
             return
 
-        # proportional control on Z, only ascend in takeoff
-        vz = self.kp_z * z_err
-        if vz < 0.0:
-            vz = 0.0
-        if vz > self.max_up_speed:
-            vz = self.max_up_speed
+        # Command a gentle descent (negative vz limited within _vz_hold)
+        vz = self._vz_hold(land_z)
+        self._cmd_vel(0.0, 0.0, vz)
 
-        cmd = Twist()
-        cmd.linear.z = vz
-        self.pub_cmd_vel.publish(cmd)
+    def hovering(self):
+        self.set_status('Hovering')
 
-    def landing(self):
-        self.set_status("Landing")
-    
-    def halting(self):
-        self.set_status("Halting")
+        # Ensure we have a *constant* Z setpoint during hover
+        if self.hover_z is None and self.currentZ is not None:
+            self.hover_z = float(self.currentZ)
 
-    def moving_to_goal(self):
-        self.set_status("Moving to Goal")
+        # Hold the frozen hover_z; if still None, fall back to currentZ
+        tgt_z = self.hover_z if self.hover_z is not None else (self.currentZ or 0.0)
+        vz = self._vz_hold(tgt_z)
+
+        # Zero XY while hovering (or swap in quick-stop XY if you want snappier braking)
+        self._cmd_vel(0.0, 0.0, vz)
+
+        # Allowed intent changes only
+        if self.last_cmd == 'move_to_goal' and self.goal_xyz is not None:
+            self.set_status('Moving to Goal')
+        elif self.last_cmd == 'land':
+            self.set_status('Landing')
 
     def emergency_landing(self):
-        self.set_status("Emergency Landing")
-
-    # ----------------- Helpers -----------------
-    def set_status(self, status: str):
-        if status not in STATUSES:
-            self.get_logger().error(f"Invalid status: {status}")
+        # Aggressive, controlled descent straight down (no XY)
+        if self.currentZ is None:
+            self.zero_twist()
             return
-        if getattr(self, "status", None) == status:
+        # Force target well below ground so PI drives fast down; limit by max_z_down internally
+        vz = self._vz_hold(-5.0)
+        self._cmd_vel(0.0, 0.0, vz)
+        if self.currentZ <= 0.15:
+            self.zero_twist()
+            self.set_status('Landed')
+
+    def _update_goal_metrics(self):
+        """Publish straight-line distance to goal and a naive ETA = distance * 2."""
+        if self.goal_xyz is None:
             return
-        self.status = status                      # <-- keep an internal state string
-        self._last_status = status
-        self.pub_status.publish(String(data=status))
-        self.get_logger().info(f"Status: {status}")
+        if self.currentX is None or self.currentY is None or self.currentZ is None:
+            return
 
+        gx, gy, gz = self.goal_xyz
+        ex = gx - self.currentX
+        ey = gy - self.currentY
+        ez = gz - self.currentZ
 
-    def setHeight(self, height: float):
-        """Setter for target height in meters."""
-        self.target_height = height
-        self.get_logger().info(f"Target height updated via setHeight: {self.target_height:.2f} m")
+        distance = math.sqrt(ex*ex + ey*ey + ez*ez)
 
-    def sub_height(self, msg: Float32):
-        """Subscriber callback for /cmd/height topic."""
-        self.setHeight(float(msg.data))
+        # Publish distance (meters)
+        self.pub_goal_dist.publish(Float32(data=float(distance)))
 
-    def sub_pose(self, msg: PoseStamped):
-        """Update currentX/Y/Z from /drone/pose_1hz."""
-        self.currentX = float(msg.pose.position.x)
-        self.currentY = float(msg.pose.position.y)
-        self.currentZ = float(msg.pose.position.z)
-        # Optional debug:
-        # self.get_logger().debug(f"pose: x={self.currentX:.2f} y={self.currentY:.2f} z={self.currentZ:.2f}")
+        # Publish time as simply distance * 2 (seconds)
+        self.pub_goal_time.publish(Float32(data=float(distance * 2.0)))
 
-    def zero_twist(self):
-        self.pub_cmd_vel.publish(Twist())
-
-    def clamp(self, v, lo, hi):
-        return max(lo, min(hi, v))
-
+    def on_odom(self, msg: Odometry):
+        t = msg.twist.twist
+        self.velX = float(t.linear.x)
+        self.velY = float(t.linear.y)
+        self.velZ = float(t.linear.z)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -253,6 +405,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        node.zero_twist()
         node.destroy_node()
         rclpy.shutdown()
 

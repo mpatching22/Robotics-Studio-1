@@ -1,2 +1,9 @@
-#GUI library
+# GUI
 PySide6>=6.5
+
+# Offboard control (PX4 SITL)
+mavsdk
+
+# (Optional, small helpers you might find handy later)
+# numpy            # vector math for waypoint/trajectory utilities
+# transforms3d     # ENU<->NED, quaternion helpers if you need them

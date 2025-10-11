@@ -26,7 +26,6 @@ Installs Required
     GUI library
         pip install pyside6
 
-
 Extra's
     To access the file explorer from the current wsl directory
         explorer.exe .
@@ -37,5 +36,7 @@ Extra's
     To kill stray gazebo instances
         ps aux | grep -E "ign|gz" | grep -v grep
         kill 223753 223755   # or:  pkill -f ros_gz_bridge
+        pkill -f "__ns:=/rs1"
+
 
         ign topic -e -t /world/simple_trees/pose/info -n 1

@@ -3,10 +3,11 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import (Command, LaunchConfiguration,
                                   PathJoinSubstitution)
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
+PushRosNamespace('rs1'),
 
 def generate_launch_description():
 
@@ -33,7 +34,7 @@ def generate_launch_description():
     ld.add_action(rviz_launch_arg)
     nav2_launch_arg = DeclareLaunchArgument(
         'nav2',
-        default_value='True',
+        default_value='False',
         description='Flag to launch Nav2'
     )
     ld.add_action(nav2_launch_arg)
@@ -92,7 +93,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '1.0'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '0.2'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 

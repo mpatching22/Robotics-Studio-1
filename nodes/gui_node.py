@@ -177,7 +177,7 @@ class TwoPaneGUI(QWidget):
                 padding-top: 16px;
             }
 
-            #btnHalt    { background: #D9C40A; }
+            #btnHover    { background: #D9C40A; }
             #btnMove    { background: #64B32D; }
             #btnLand    { background: #F06A1A; }
             #btnTakeoff { background: #0C8F24; }
@@ -510,14 +510,15 @@ class TwoPaneGUI(QWidget):
         # Put the inputs above the grid of big buttons
         right.addLayout(inputs)
 
-        # Row 1: HALT | MOVE TO GOAL
+        # Row 1: HOVER | MOVE TO GOAL
         row1 = QHBoxLayout(); row1.setSpacing(18)
-        btn_halt = QPushButton("HALT");         btn_halt.setObjectName("btnHalt");   config_btn(btn_halt)
-        btn_move = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   config_btn(btn_move)
+        btn_hover = QPushButton("HOVER");        btn_hover.setObjectName("btnHover"); config_btn(btn_hover)
+        btn_move  = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   config_btn(btn_move)
         # Equal widths across the row:
-        row1.addWidget(btn_halt, 1)
+        row1.addWidget(btn_hover, 1)
         row1.addWidget(btn_move, 1)
         grid_col.addLayout(row1)
+
 
         # Row 2: LAND | TAKEOFF
         row2 = QHBoxLayout(); row2.setSpacing(18)
@@ -548,7 +549,7 @@ class TwoPaneGUI(QWidget):
         def _hook(btn_text, color_hex):
             return lambda: (self.ros_node.send(btn_text), self.update_last_command(btn_text, color_hex))
         
-        btn_halt.clicked.connect(_hook("HALT", "#D9C40A"))
+        btn_hover.clicked.connect(_hook("HOVER", "#D9C40A"))
         btn_move.clicked.connect(_hook("MOVE TO GOAL", "#64B32D"))
         btn_land.clicked.connect(_hook("LAND", "#F06A1A"))
         btn_take.clicked.connect(_hook("TAKEOFF", "#0C8F24"))
@@ -589,18 +590,21 @@ class TwoPaneGUI(QWidget):
         )
 
     def update_status_box(self, status: str):
+        status_key = status.strip().lower()
         mapping = {
-            "Pre Flight Checks": ("PRE-FLIGHT", "#CCCCCC"), # grey
-            "Landed":       ("LANDED", "#F06A1A"),   # orange
-            "Landing":      ("LANDING", "#C75610"),  # darker orange
-            "Taking off":   ("TAKING OFF", "#0C8F24"), # dark green
-            "Halted":       ("HALTED", "#D9C40A"),   # yellow
-            "Moving to goal": ("MOVING TO GOAL", "#64B32D"), # light green
-            "Arrived at goal": ("ARRIVED AT GOAL", "#1A73E8"), # blue
-            "Emergency Landing": ("EMERGENCY LANDING", "#CF1C12"), # 🔴 red
+            "pre flight checks": ("PRE-FLIGHT", "#CCCCCC"),
+            "landed":            ("LANDED", "#F06A1A"),
+            "landing":           ("LANDING", "#C75610"),
+            "taking off":        ("TAKING OFF", "#0C8F24"),
+            "hovering":          ("HOVERING", "#D9C40A"),
+            "moving to goal":    ("MOVING TO GOAL", "#64B32D"),
+            "arrived at goal":   ("ARRIVED AT GOAL", "#1A73E8"),
+            "emergency landing": ("EMERGENCY LANDING", "#CF1C12"),
         }
 
-        text, color = mapping.get(status, (status.upper(), "#CCCCCC"))
+
+        text, color = mapping.get(status_key, (status.upper(), "#CCCCCC"))
+
 
         self.status_text.setText(text)
         self.status_box.setStyleSheet(
