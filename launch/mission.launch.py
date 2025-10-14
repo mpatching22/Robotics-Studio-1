@@ -3,11 +3,10 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import (Command, LaunchConfiguration,
                                   PathJoinSubstitution)
-from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-PushRosNamespace('rs1'),
 
 def generate_launch_description():
 
@@ -34,7 +33,7 @@ def generate_launch_description():
     ld.add_action(rviz_launch_arg)
     nav2_launch_arg = DeclareLaunchArgument(
         'nav2',
-        default_value='False',
+        default_value='True',
         description='Flag to launch Nav2'
     )
     ld.add_action(nav2_launch_arg)
@@ -69,21 +68,19 @@ def generate_launch_description():
     # Start Gazebo to simulate the robot in the chosen world
     world_launch_arg = DeclareLaunchArgument(
         'world',
-        default_value='simple_trees.sdf',
-        choices=['simple_trees.sdf', 'large_demo.sdf'],
-        description='Which world to load'
+        default_value='simple_trees',
+        description='Which world to load',
+        choices=['simple_trees', 'large_demo']
     )
     ld.add_action(world_launch_arg)
-
     gazebo = IncludeLaunchDescription(
         PathJoinSubstitution([FindPackageShare('ros_ign_gazebo'),
-                            'launch', 'ign_gazebo.launch.py']),
+                             'launch', 'ign_gazebo.launch.py']),
         launch_arguments={
-            'ign_args': [
-                PathJoinSubstitution([pkg_path, 'worlds', LaunchConfiguration('world')]),
-                ' -r'
-            ]
-        }.items()
+            'ign_args': [PathJoinSubstitution([pkg_path,
+                                               'worlds',
+                                               [LaunchConfiguration('world'), '.sdf']]),
+                         ' -r']}.items()
     )
     ld.add_action(gazebo)
 
@@ -102,7 +99,7 @@ def generate_launch_description():
         package='ros_ign_bridge',
         executable='parameter_bridge',
         parameters=[{'config_file': PathJoinSubstitution([config_path,
-                                                          'gazebo_bridge.yaml']), 
+                                                          'gazebo_bridge.yaml']),
                     'use_sim_time': use_sim_time}]
     )
     ld.add_action(gazebo_bridge)
@@ -136,6 +133,7 @@ def generate_launch_description():
         executable='pose_relay.py',
         name='pose_relay',
         output='screen',
+        namespace='rs1',
         parameters=[{
             'source_topic': '/odometry',     # or '/odometry'
             'source_type': 'odom',             # 'odom' if using /odometry
@@ -146,10 +144,25 @@ def generate_launch_description():
     )
     ld.add_action(pose_relay)
 
+    altitude_lidar = Node(
+        package='trailblazer',
+        executable='altitude_lidar.py',
+        name='altitude_lidar',
+        output='screen',
+        namespace='rs1',
+        parameters=[{
+            'scan_topic': '/downscan',
+            'center_deg': 0.0,   # 0 = straight down (assuming your rotation)
+            'window_deg': 5.0
+        }]
+    )
+    ld.add_action(altitude_lidar)
+
     gui_node = Node(
         package='trailblazer',
         executable='gui_node.py',    
         name='trailblazer_gui',
+        namespace='rs1',
         output='screen'
     )
     ld.add_action(gui_node)
@@ -159,6 +172,7 @@ def generate_launch_description():
         executable='flight_control.py',   # must match installed filename
         name='flight_control',
         output='screen',
+        namespace='rs1',
         parameters=[{
             'control_rate_hz': 10.0
         }]

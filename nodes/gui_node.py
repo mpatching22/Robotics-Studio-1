@@ -56,6 +56,10 @@ class GuiNode(Node):
         self.sub_pose_ps = self.create_subscription(
             PoseStamped, '/drone/pose_1hz', self.pose_callback_ps, 10
         )
+        
+        self.sub_hag = self.create_subscription(
+            Float32, '/altitude/hag', self.hag_cb, 10
+        )
                 
         self.sub_goal_dist = self.create_subscription(
             Float32, '/goal/distance', self.goal_dist_cb, 10
@@ -78,6 +82,10 @@ class GuiNode(Node):
         if hasattr(self, 'gui_ref') and self.gui_ref:
             # seconds as float; GUI formats to mm:ss
             self.gui_ref.goal_eta_signal.emit(float(msg.data))
+    def hag_cb(self, msg: Float32):
+        if hasattr(self, 'gui_ref') and self.gui_ref:
+            # allow NaN to show as "—"
+            self.gui_ref.hag_signal.emit(float(msg.data))
 
     def camera_cb(self, msg: Image):
         try:
@@ -130,6 +138,7 @@ class TwoPaneGUI(QWidget):
     goal_eta_signal  = Signal(float)
     camera_signal    = Signal(object)  # numpy/cv2 frame
     pose_signal   = Signal(float, float, float)  # X, Y, Z
+    hag_signal = Signal(float)
     camera_signal = Signal(object)               # cv2 frame (numpy array)
 
 
@@ -142,6 +151,7 @@ class TwoPaneGUI(QWidget):
         self.camera_signal.connect(self.update_camera_view)
         self.status_signal.connect(self.update_status_box)
         self.pose_signal.connect(self.update_current_position)
+        self.hag_signal.connect(self.update_hag_box)
         self.camera_signal.connect(self.update_camera_view)
 
 
@@ -305,6 +315,30 @@ class TwoPaneGUI(QWidget):
         pos_v.addWidget(self.pos_box, 0, Qt.AlignHCenter)
         left.addWidget(pos_container, 0, Qt.AlignHCenter)
 
+        # --- Height Based off LIDAR ---
+        hag_container = QWidget()
+        hag_v = QVBoxLayout(hag_container)
+        hag_v.setContentsMargins(8, 6, 8, 6)
+        hag_v.setSpacing(1)
+
+        hag_lbl = QLabel("Height Based off LIDAR")
+        hag_lbl.setObjectName("statusLabel")
+        hag_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+
+        self.hag_box = QFrame()
+        self.hag_box.setObjectName("miniBox")
+        self.hag_box.setFixedSize(260, 60)
+
+        self.hag_text = QLabel("— m")
+        self.hag_text.setAlignment(Qt.AlignCenter)
+        _hag_box_layout = QVBoxLayout(self.hag_box)
+        _hag_box_layout.setContentsMargins(4,4,4,4)
+        _hag_box_layout.addWidget(self.hag_text, 0, Qt.AlignCenter)
+
+        hag_v.addWidget(hag_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
+        hag_v.addWidget(self.hag_box, 0, Qt.AlignHCenter)
+        left.addWidget(hag_container, 0, Qt.AlignHCenter)
+
 
         # --- Distance to Goal ---
         dist_container = QWidget()
@@ -366,7 +400,7 @@ class TwoPaneGUI(QWidget):
 
         self.video_box = QFrame()
         self.video_box.setObjectName("videoBox")
-        self.video_box.setFixedSize(260, 180)
+        self.video_box.setFixedSize(260, 120)
 
         self.video_placeholder = QLabel("No Video")
         self.video_placeholder.setAlignment(Qt.AlignCenter)
@@ -644,6 +678,11 @@ class TwoPaneGUI(QWidget):
             m = (secs % 3600) // 60
             self.time_text.setText(f"{h} h {m} m")
 
+    def update_hag_box(self, hag_m: float):
+        if hag_m != hag_m:  # NaN check
+            self.hag_text.setText("— m")
+        else:
+            self.hag_text.setText(f"{hag_m:.2f} m")
 
     def update_camera_view(self, frame):
         # frame is a cv2 BGR image (H x W x 3)

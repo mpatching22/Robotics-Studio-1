@@ -35,8 +35,12 @@ Extra's
 
     To kill stray gazebo instances
         ps aux | grep -E "ign|gz" | grep -v grep
+
         kill 223753 223755   # or:  pkill -f ros_gz_bridge
+
         pkill -f "__ns:=/rs1"
 
+        ros2 daemon stop
+        ros2 daemon start
 
         ign topic -e -t /world/simple_trees/pose/info -n 1
