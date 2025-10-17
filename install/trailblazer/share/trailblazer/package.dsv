@@ -1,0 +1,8 @@
+source;share/trailblazer/hook/cmake_prefix_path.ps1
+source;share/trailblazer/hook/cmake_prefix_path.dsv
+source;share/trailblazer/hook/cmake_prefix_path.sh
+source;share/trailblazer/local_setup.bash
+source;share/trailblazer/local_setup.dsv
+source;share/trailblazer/local_setup.ps1
+source;share/trailblazer/local_setup.sh
+source;share/trailblazer/local_setup.zsh

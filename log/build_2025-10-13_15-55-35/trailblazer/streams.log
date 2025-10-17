@@ -1,0 +1,91 @@
+[0.014s] Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble PS1=(.venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(.venv) /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
+[0.049s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.136s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.150s] -- Found ros_ign_interfaces: 0.244.20 (/opt/ros/humble/share/ros_ign_interfaces/cmake)
+[0.271s] -- Found rosidl_generator_c: 3.1.7 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.275s] -- Found rosidl_adapter: 3.1.7 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.283s] -- Found rosidl_generator_cpp: 3.1.7 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.294s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.308s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.387s] -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[0.449s] -- Added test 'copyright' to check source files copyright and LICENSE
+[0.530s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[0.530s] -- Configured cppcheck include dirs: 
+[0.530s] -- Configured cppcheck exclude dirs and/or files: 
+[0.558s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[0.558s] -- Configured cpplint exclude dirs and/or files: 
+[0.563s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.570s] -- Added test 'lint_cmake' to check CMake code style
+[0.574s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.603s] -- Added test 'uncrustify' to check C / C++ code style
+[0.603s] -- Configured uncrustify additional arguments: 
+[0.608s] -- Added test 'xmllint' to check XML markup files
+[0.611s] -- Configuring done
+[0.618s] -- Generating done
+[0.620s] -- Build files have been written to: /home/mpatching/trailblazer/build/trailblazer
+[0.635s] Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble PS1=(.venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(.venv) /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
+[0.642s] Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble PS1=(.venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(.venv) /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer
+[0.648s] -- Install configuration: ""
+[0.648s] -- Execute custom install script
+[0.648s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/41068.rviz
+[0.648s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/gazebo_bridge.yaml
+[0.648s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/nav2_params.yaml
+[0.648s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/robot_localization.yaml
+[0.648s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/slam_params.yaml
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/41068_ignition.launch.py
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/mission.launch.py
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/navigation.launch.py
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/pine_tree_detection.launch.py
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/boulder/boulder.sdf
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/boulder/model.config
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/empty_grass.png
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/forest_overhead.png
+[0.649s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/leaf_litter.png
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/model.config
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/model.sdf
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall.png
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall_transparent.png
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall_transparent_small.png
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/model.config
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/model.sdf
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/materials/textures/empty_grass.png
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/model.config
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/model.sdf
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/large_demo.sdf
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/simple_trees.sdf
+[0.650s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/common_properties.urdf.xacro
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/hokuyo.urdf.xacro
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/hull.dae
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fl.dae
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fr.dae
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_rl.dae
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_rr.dae
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/model.config
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/model.sdf
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/parrot.gazebo.xacro
+[0.651s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/parrot.urdf.xacro
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/1.png
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/2.png
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/3.png
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/4.png
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/5.png
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/hull.dae
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/gui_node.py
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/flight_control.py
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/pose_relay.py
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/package_run_dependencies/trailblazer
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/parent_prefix_path/trailblazer
+[0.652s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/ament_prefix_path.sh
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/ament_prefix_path.dsv
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/path.sh
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/path.dsv
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.bash
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.sh
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.zsh
+[0.653s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.dsv
+[0.653s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/package.dsv
+[0.660s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/packages/trailblazer
+[0.660s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/cmake/trailblazerConfig.cmake
+[0.660s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/cmake/trailblazerConfig-version.cmake
+[0.660s] -- Up-to-date symlink: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/package.xml
+[0.661s] Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble PS1=(.venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(.venv) /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer
