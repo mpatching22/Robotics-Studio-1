@@ -7,6 +7,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Point
 from std_msgs.msg import Float32, String
 from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import Float32MultiArray
 
 def wrap_to_pi(a):
     return (a + math.pi) % (2*math.pi) - math.pi
@@ -35,6 +36,7 @@ class LidarPerception360(Node):
         self.pub_nearest = self.create_publisher(Point,   '/nearest_obstacle', 10)
         self.pub_status  = self.create_publisher(String,  '/detection_status', 10)
         self.pub_markers = self.create_publisher(MarkerArray, '/perception/markers', 10)
+        self.pub_sectors = self.create_publisher(Float32MultiArray, '/sector_mins', 10)
 
         self.get_logger().info(f'Perception online; listening to {scan_topic}')
 
@@ -77,6 +79,10 @@ class LidarPerception360(Node):
         for s in range(nsec):
             seg = rng[s*step : min((s+1)*step, n)]
             sector_mins.append(float(np.nanmin(seg)) if np.any(~np.isnan(seg)) else float(msg.range_max))
+
+        arr = Float32MultiArray()
+        arr.data = sector_mins
+        self.pub_sectors.publish(arr)
 
         # STATUS STRING
         near_thr = float(self.get_parameter('min_obs_dist').value)

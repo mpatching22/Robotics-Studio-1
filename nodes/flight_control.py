@@ -7,6 +7,10 @@ from rclpy.duration import Duration
 from std_msgs.msg import String, Float32
 from geometry_msgs.msg import PoseStamped, PointStamped, Twist
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Float32MultiArray
+
+import numpy as np
+import tf_transformations as tft  # For quaternion to rotation matrix
 
 GUI_TO_CMD = {
     "HOVER": "hover",
@@ -51,6 +55,8 @@ class FlightControl(Node):
         self.declare_parameter('ki_z',           0.20)
         self.declare_parameter('pos_tol_xy',     0.25)
         self.declare_parameter('pos_tol_z',      0.15)
+        self.declare_parameter('rep_threshold', 3.0)  # Max distance for repulsion (m); matches your min_obs_dist
+        self.declare_parameter('k_rep', 2.0)          # Repulsive gain; higher = stronger avoidance
 
         # Read params
         self.ctrl_hz      = float(self.get_parameter('control_rate_hz').value)
@@ -62,6 +68,8 @@ class FlightControl(Node):
         self.ki_z         = float(self.get_parameter('ki_z').value)
         self.pos_tol_xy   = float(self.get_parameter('pos_tol_xy').value)
         self.pos_tol_z    = float(self.get_parameter('pos_tol_z').value)
+        self.rep_threshold = float(self.get_parameter('rep_threshold').value)
+        self.k_rep = float(self.get_parameter('k_rep').value)
 
         # --- Subscribers ---
         self.sub_cmd      = self.create_subscription(String,       '/cmd/control',   self.on_cmd,   10)
@@ -76,6 +84,9 @@ class FlightControl(Node):
 
         # Subscribe to filtered odometry (preferred). If you don’t have this, use /odometry.
         self.sub_odom = self.create_subscription(Odometry, '/odometry/filtered', self.on_odom, 10)
+
+        self.sub_sectors = self.create_subscription(Float32MultiArray, '/sector_mins', self.on_sectors, 10)
+        self.sector_mins = None  # List of min distances per sector
 
 
         # --- Internal state ---
@@ -104,8 +115,12 @@ class FlightControl(Node):
         self.set_status(self.status)
 
     # ----------------- Utilities -----------------
+    def on_sectors(self, msg: Float32MultiArray):
+        self.sector_mins = msg.data
+        
     def clamp(self, x, lo, hi):
         return lo if x < lo else hi if x > hi else x
+        
 
     def set_status(self, s: str):
         if s != self._last_status:
@@ -298,25 +313,65 @@ class FlightControl(Node):
         ey = gy - self.currentY
         ez = gz - (self.currentZ if self.currentZ is not None else gz)
 
-        # Arrival check
+        # Arrival check (unchanged)
         if abs(ex) <= self.pos_tol_xy and abs(ey) <= self.pos_tol_xy and abs(ez) <= self.pos_tol_z:
             self.set_status('Arrived at Goal')
-            # Publish distance (meters)
             self.pub_goal_dist.publish(Float32(data=0.0))
-
-            # Publish time as simply distance * 2 (seconds)
             self.pub_goal_time.publish(Float32(data=0.0))
-            # keep holding goal altitude
             vz = self._vz_hold(gz)
             self._cmd_vel(0.0, 0.0, vz)
             return
 
-        # XY proportional control
-        vx = self.kp_xy * ex
-        vy = self.kp_xy * ey
-
-        # Z via PI hold to goal.z
+        # Z via PI hold to goal.z (unchanged)
         vz = self._vz_hold(gz)
+
+        # XY with potential fields
+        att = np.array([self.kp_xy * ex, self.kp_xy * ey])  # Attractive vector
+        att_mag = np.linalg.norm(att)
+        if att_mag > self.max_xy_speed:
+            att = (att / att_mag) * self.max_xy_speed
+
+        rep = np.zeros(2)  # Repulsive vector (in world frame)
+
+        if self.sector_mins is not None and self.current_pose is not None and len(self.sector_mins) > 0:
+            nsec = len(self.sector_mins)
+            sector_width = 2 * math.pi / nsec
+            sector_angles = [(i + 0.5) * sector_width for i in range(nsec)]  # Centers (rad), assuming angle_min=0
+
+            # Get 2x2 rotation matrix from current orientation (to transform body-frame obstacle points to world)
+            q = [self.current_pose.orientation.x, self.current_pose.orientation.y,
+                self.current_pose.orientation.z, self.current_pose.orientation.w]
+            rot = tft.quaternion_matrix(q)[0:2, 0:2]  # XY rotation only
+
+            for i in range(nsec):
+                d = self.sector_mins[i]
+                if d >= self.rep_threshold or not np.isfinite(d):
+                    continue  # Ignore far/invalid sectors
+
+                a = sector_angles[i]  # Sector center angle (body frame)
+                px_b = d * math.cos(a)
+                py_b = d * math.sin(a)
+                p_b = np.array([px_b, py_b])
+
+                # Transform to world frame
+                p_w = np.dot(rot, p_b) + np.array([self.currentX, self.currentY])
+
+                # Repulsive direction: from obstacle to drone (push away)
+                dir_vec = np.array([self.currentX, self.currentY]) - p_w
+                dist = np.linalg.norm(dir_vec)
+                if dist > 0.01:  # Avoid div/0
+                    rep_mag = self.k_rep * ((1.0 / dist) - (1.0 / self.rep_threshold)) ** 2
+                    rep_dir = dir_vec / dist
+                    rep += rep_mag * rep_dir
+
+        # Total desired velocity vector
+        total = att + rep
+        total_mag = np.linalg.norm(total)
+        if total_mag > self.max_xy_speed:
+            total = (total / total_mag) * self.max_xy_speed
+
+        vx = total[0]
+        vy = total[1]
 
         self._cmd_vel(vx, vy, vz)
         self._update_goal_metrics()
