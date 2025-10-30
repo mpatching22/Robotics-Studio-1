@@ -1,1 +1,1 @@
-/home/mpatching/41068_ws/src/trailblazer/launch/mission.launch.py
+/home/mpatching/trailblazer/launch/mission.launch.py

@@ -89,7 +89,7 @@ def generate_launch_description():
 
     # Spawn robot in Gazebo
     robot_spawner = Node(
-        package='ros_ign_gazebo',
+        package='ros_gz_sim',
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
@@ -99,7 +99,7 @@ def generate_launch_description():
 
     # Bridge topics between gazebo and ROS2
     gazebo_bridge = Node(
-        package='ros_ign_bridge',
+        package='ros_gz_bridge',
         executable='parameter_bridge',
         parameters=[{'config_file': PathJoinSubstitution([config_path,
                                                           'gazebo_bridge.yaml']), 
@@ -146,13 +146,13 @@ def generate_launch_description():
     )
     ld.add_action(pose_relay)
 
-    gui_node = Node(
-        package='trailblazer',
-        executable='gui_node.py',    
-        name='trailblazer_gui',
-        output='screen'
-    )
-    ld.add_action(gui_node)
+    # gui_node = Node(
+    #     package='trailblazer',
+    #     executable='gui_node.py',    
+    #     name='trailblazer_gui',
+    #     output='screen'
+    # )
+    # ld.add_action(gui_node)
 
     flight_control_node = Node(
         package='trailblazer',
@@ -164,5 +164,20 @@ def generate_launch_description():
         }]
     )
     ld.add_action(flight_control_node)
+
+    lidar_node = Node(
+        package='trailblazer',
+        executable='lidar_perception_360.py',
+        name='lidar_perception_360',
+        output='screen',
+        parameters=[{
+            'scan_topic': '/scan',
+            'num_sectors': 8,
+            'front_sector_deg': 60.0,
+            'min_obs_dist': 3.0
+        }]
+    )
+    ld.add_action(lidar_node)
+
 
     return ld

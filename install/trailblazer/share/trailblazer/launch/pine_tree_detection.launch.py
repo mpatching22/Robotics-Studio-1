@@ -1,1 +1,1 @@
-/home/mpatching/41068_ws/src/trailblazer/launch/pine_tree_detection.launch.py
+/home/mpatching/trailblazer/launch/pine_tree_detection.launch.py

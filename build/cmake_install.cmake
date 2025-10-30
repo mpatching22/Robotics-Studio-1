@@ -61,6 +61,8 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
     "/home/mpatching/trailblazer/nodes/minimal_drone_nav.py"
     "/home/mpatching/trailblazer/nodes/altitude_mixer.py"
     "/home/mpatching/trailblazer/nodes/waypoint_planner.py"
+    "/home/mpatching/trailblazer/nodes/flight_control.py"
+    "/home/mpatching/trailblazer/nodes/gui_node.py"
     )
 endif()
 

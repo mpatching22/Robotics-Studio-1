@@ -5,7 +5,7 @@ set(trailblazer_BUILD_DEPENDS "ros_ign_interfaces" "ros_ign_gazebo" "ros_ign_bri
 set(trailblazer_BUILDTOOL_DEPENDS "ament_cmake")
 set(trailblazer_BUILD_EXPORT_DEPENDS "ros_ign_interfaces" "ros_ign_gazebo" "ros_ign_bridge" "robot_localization")
 set(trailblazer_BUILDTOOL_EXPORT_DEPENDS )
-set(trailblazer_EXEC_DEPENDS "rclpy" "sensor_msgs" "std_msgs" "visualization_msgs" "geometry_msgs" "nav2_msgs" "nav2_simple_commander" "nav2_bringup" "ros_ign_interfaces" "ros_ign_gazebo" "ros_ign_bridge" "robot_localization")
+set(trailblazer_EXEC_DEPENDS "rclpy" "PySide6" "geometry_msgs" "ros_ign_interfaces" "ros_ign_gazebo" "ros_ign_bridge" "robot_localization")
 set(trailblazer_TEST_DEPENDS "ament_lint_auto" "ament_lint_common")
 set(trailblazer_GROUP_DEPENDS )
 set(trailblazer_MEMBER_OF_GROUPS )

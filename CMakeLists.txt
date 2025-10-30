@@ -5,40 +5,28 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
+# Only keep this if you actually use those msg types in code:
+# find_package(ros_ign_interfaces REQUIRED)
 
-find_package(ros_ign_interfaces REQUIRED)
-
-install(
-  DIRECTORY config launch models worlds urdf_drone
+# Install non-code assets used at runtime
+install(DIRECTORY
+  config launch models worlds urdf_drone
   DESTINATION share/${PROJECT_NAME}
 )
 
-# if(BUILD_TESTING)
-#   find_package(ament_lint_auto REQUIRED)
-#   ament_lint_auto_find_test_dependencies()
-# endif()
-
+# Install Python executables (must be +x and have a shebang)
 install(PROGRAMS
   nodes/lidar_perception_360.py
   nodes/pose_relay.py
   nodes/climb_controller.py
   nodes/forward_10m_cli.py
   nodes/minimal_drone_nav.py
-  nodes/altitude_mixer.py     
-  nodes/waypoint_planner.py      # <--- add this line
+  nodes/altitude_mixer.py
+  nodes/waypoint_planner.py
+  nodes/flight_control.py
+  nodes/gui_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
-
-
-
-# # Install Python nodes (executables) into lib/${PROJECT_NAME}
-# install(PROGRAMS
-#   nodes/gui.node.py
-#   nodes/flight.control.py 
-#   DESTINATION lib/${PROJECT_NAME}
-# )
-
 
 ament_package()

@@ -17,6 +17,11 @@
   <!-- Other -->
   <depend>robot_localization</depend>
 
+  <!-- GUI -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>PySide6</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
@@ -25,16 +30,4 @@
     <gazebo_ros gazebo_model_path="${prefix}/models"/>
     <gazebo_ros gazebo_media_path="${prefix}/worlds"/>
   </export>
-
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>visualization_msgs</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav2_msgs</exec_depend>
-  <exec_depend>nav2_simple_commander</exec_depend>
-  <exec_depend>nav2_bringup</exec_depend>
-
-
-
 </package>
