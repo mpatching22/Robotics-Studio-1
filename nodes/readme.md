@@ -7,7 +7,7 @@ ros2 topic pub /cmd/control std_msgs/msg/String "data: 'takeoff'"
 ros2 topic pub /cmd/control std_msgs/msg/String "data: 'move_to_goal'"
 
 3. Publish Position Goal
-ros2 topic pub /cmd/goal geometry_msgs/msg/PointStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'map'}, point: {x: 3, y: 3, z: 2}}"
+ros2 topic pub /cmd/goal geometry_msgs/msg/PointStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'map'}, point: {x: 4, y: 3, z: 2}}"
 
 4. Adjust Altitude (Optional)
 ros2 topic pub /cmd/height std_msgs/msg/Float32 "{data: TARGET_Z}"

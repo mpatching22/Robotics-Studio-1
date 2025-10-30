@@ -52,15 +52,17 @@
     </include>
 
     <!-- === Obstacles for A* / LiDAR testing === -->
-    <model name="box_centre">
-      <pose>1 2 3 0 0 0</pose>
+
+
+    <model name="Wall 0">
+      <pose>0 -1.75 1.5 0 0 0</pose>
       <static>true</static>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>2 2 2</size></box></geometry>
+          <geometry><box><size>2 0.5 3</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>2 2 2</size></box></geometry>
+          <geometry><box><size>2 0.5 3</size></box></geometry>
           <material>
             <ambient>0.8 0.2 0.2 1</ambient>
             <diffuse>0.8 0.2 0.2 1</diffuse>
@@ -69,15 +71,33 @@
       </link>
     </model>
 
-    <model name="box_left">
-      <pose>2 0.5 3 0 0 0</pose>
+
+    <model name="Wall 1.A">
+      <pose>1 0 1.5 0 0 0</pose>
       <static>true</static>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>1 1 1</size></box></geometry>
+          <geometry><box><size>0.5 3 3</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>1 1 1</size></box></geometry>
+          <geometry><box><size>0.5 3 3</size></box></geometry>
+          <material>
+            <ambient>0.8 0.2 0.2 1</ambient>
+            <diffuse>0.8 0.2 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="Wall 1.B">
+      <pose>-1 1 1.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.5 5 3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.5 5 3</size></box></geometry>
           <material>
             <ambient>0.2 0.8 0.2 1</ambient>
             <diffuse>0.2 0.8 0.2 1</diffuse>
@@ -86,15 +106,16 @@
       </link>
     </model>
 
-    <model name="box_right">
-      <pose>2 3.5 3 0 0 0</pose>
+ 
+    <model name="Wall 2.A">
+      <pose>2.75 1.75 1.5 0 0 0</pose>
       <static>true</static>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.5 0.5 0.5</size></box></geometry>
+          <geometry><box><size>4 0.5 3</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>1 1 1</size></box></geometry>
+          <geometry><box><size>4 0.5 3</size></box></geometry>
           <material>
             <ambient>0.2 0.2 0.8 1</ambient>
             <diffuse>0.2 0.2 0.8 1</diffuse>
@@ -102,6 +123,24 @@
         </visual>
       </link>
     </model>
+
+    <model name="Wall 2.B">
+      <pose>1.9 3.75 1.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>6.25 0.5 3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>6.25 0.5 3</size></box></geometry>
+          <material>
+            <ambient>0.2 0.2 0.8 1</ambient>
+            <diffuse>0.2 0.2 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+<!-- 
 
     <model name="pillar_far">
       <pose>3.5 1.5 3 0 0 0</pose>
@@ -136,7 +175,7 @@
         </visual>
       </link>
     </model>
-    <!-- ======================================= -->
+    ======================================= -->
 
     <!-- <include>
       <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree</uri>
