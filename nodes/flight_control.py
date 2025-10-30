@@ -115,6 +115,12 @@ class FlightControl(Node):
         self.set_status(self.status)
 
     # ----------------- Utilities -----------------
+    def get_yaw_from_pose(self, pose):
+        q = pose.orientation
+        _, _, yaw = tft.euler_from_quaternion([q.x, q.y, q.z, q.w])
+        return yaw
+
+    
     def on_sectors(self, msg: Float32MultiArray):
         self.sector_mins = msg.data
         
@@ -370,11 +376,42 @@ class FlightControl(Node):
         if total_mag > self.max_xy_speed:
             total = (total / total_mag) * self.max_xy_speed
 
-        vx = total[0]
-        vy = total[1]
+        # Calculate current yaw
+        current_yaw = self.get_yaw_from_pose(self.current_pose)
 
-        self._cmd_vel(vx, vy, vz)
+        # Desired velocity vector (already scaled)
+        vx_global = total[0]
+        vy_global = total[1]
+
+        # Desired yaw (heading) angle to move toward
+        desired_yaw = math.atan2(vy_global, vx_global)
+
+        # Yaw error (wrap between -pi and pi)
+        yaw_error = desired_yaw - current_yaw
+        yaw_error = math.atan2(math.sin(yaw_error), math.cos(yaw_error))  # normalize
+
+        # Proportional yaw controller
+        k_yaw = 1.5  # Tune this gain
+        max_yaw_rate = math.radians(45)  # Maximum yaw rate in rad/s
+        yaw_rate_cmd = k_yaw * yaw_error
+        yaw_rate_cmd = max(-max_yaw_rate, min(max_yaw_rate, yaw_rate_cmd))
+
+        # Convert global velocity into body frame forward velocity
+        c = math.cos(-current_yaw)
+        s = math.sin(-current_yaw)
+        vx_body = c * vx_global - s * vy_global
+        vy_body = s * vx_global + c * vy_global  # optional - can be zero
+
+        # Send commands: linear.x forward, linear.y zero or vy_body, angular.z yaw rate, linear.z vertical velocity
+        tw = Twist()
+        tw.linear.x = float(self.clamp(vx_body, -self.max_xy_speed, self.max_xy_speed))
+        tw.linear.y = 0.0  # or vy_body for more holonomic control
+        tw.linear.z = float(vz)
+        tw.angular.z = float(yaw_rate_cmd)
+        self.pub_cmd_vel.publish(tw)
+
         self._update_goal_metrics()
+
 
     def landing(self):
         # Descend toward a small near-ground height (e.g., 0.10 m)
