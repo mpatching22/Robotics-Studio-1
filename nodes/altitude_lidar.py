@@ -49,16 +49,26 @@ class DownscanAltitude(Node):
         vals = np.array(vals, dtype=np.float32)
         angs = np.array(angs, dtype=np.float32)
 
-        if vals <= 0.04:
-            vals = 0.00
+        # Treat anything <= 4 cm as "on ground". Don't collapse vals to a scalar.
+        close_mask = vals <= 0.04
+        if np.any(close_mask):
+            # If every reading is very close, HAG = 0; else use median of non-close readings.
+            hag = 0.0 if np.all(close_mask) else float(np.median(vals[~close_mask]))
+        else:
+            hag = float(np.median(vals))
 
-        hag = float(np.median(vals))
         idx_min = int(np.argmin(vals))
         down_angle = float(angs[idx_min])
 
-        self.pub_hag.publish(Float32(data=hag))
-        self.pub_angle.publish(Float32(data=down_angle))
+        # --- publish results ---
+        msg_hag = Float32()
+        msg_hag.data = hag
+        self.pub_hag.publish(msg_hag)
 
+        msg_ang = Float32()
+        msg_ang.data = down_angle
+        self.pub_angle.publish(msg_ang)
+        
 def main():
     rclpy.init()
     n = DownscanAltitude()
