@@ -27,7 +27,7 @@
 
   <export>
     <build_type>ament_cmake</build_type>
-    <ros_gz_sim gazebo_resource_path="${prefix}/models"/>
-    <ros_gz_sim gazebo_resource_path="${prefix}/worlds"/>  <!-- If you have media in worlds too -->
+    <gazebo_ros gazebo_model_path="${prefix}/models"/>
+    <gazebo_ros gazebo_media_path="${prefix}/worlds"/>
   </export>
 </package>
