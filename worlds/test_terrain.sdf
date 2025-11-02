@@ -1,19 +1,29 @@
 <?xml version="1.0"?>
 <sdf version='1.8'>
-  <world name="large_demo">
-    <!-- Basic world setup  -->
+  <world name="test_terrain">
+    <!-- Basic world setup (same as large_demo.sdf) -->
     <plugin name='ignition::gazebo::systems::Physics' filename='ignition-gazebo-physics-system' />
     <plugin name='ignition::gazebo::systems::UserCommands' filename='ignition-gazebo-user-commands-system' />
     <plugin name='ignition::gazebo::systems::SceneBroadcaster' filename='ignition-gazebo-scene-broadcaster-system' />
     <plugin name='ignition::gazebo::systems::Contact' filename='ignition-gazebo-contact-system' />
+
+    <!-- Lighting -->
     <light name="sun" type="directional">
       <cast_shadows>0</cast_shadows>
       <pose>0 0 100 0 -0 0</pose>
       <diffuse>0.8 0.8 0.8 1</diffuse>
       <specular>0.8 0.8 0.8 1</specular>
+      <!-- <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation> -->
       <direction>-0.5 0.1 -0.9</direction>
       <intensity>5</intensity>
     </light>
+
+    <!-- Physics / environment -->
     <gravity>0 0 -9.81</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type="adiabatic"/>
@@ -22,12 +32,14 @@
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>100</real_time_update_rate>
     </physics>
+
     <scene>
-      <ambient>1.0 1.0 1.0 1</ambient>
-      <background>0.6 0.8 1.0 1</background>
-      <shadows>0</shadows>
+      <ambient>0.3 0.3 0.3 1</ambient>
+      <background>0.15 0.15 0.18 1</background>  <!-- dark grey-blue -->
+      <shadows>1</shadows>
       <grid>0</grid>
     </scene>
+
     <spherical_coordinates>
       <latitude_deg>0.0</latitude_deg>
       <longitude_deg>0.0</longitude_deg>
@@ -35,173 +47,15 @@
       <heading_deg>0</heading_deg>
       <surface_model>EARTH_WGS84</surface_model>
     </spherical_coordinates>
-<model name="ground_plane">
-      <static>1</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>100</mu>
-                <mu2>50</mu2>
-              </ode>
-              <torsional>
-                <ode />
-              </torsional>
-            </friction>
-            <contact>
-              <ode />
-            </contact>
-            <bounce />
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name="visual">
-          <cast_shadows>0</cast_shadows>
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grey</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-    </model>
-    
-<model name="vrc_driving_terrain">
-      <static>1</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <heightmap>
-              <uri>model://vrc_driving_terrain/materials/textures/heightmap.png</uri>
-              <size>500 500 118</size>
-              <pos>0 0 -15</pos>
-              <texture>
-                <size>10</size>
-                <diffuse>__default__</diffuse>
-                <normal>__default__</normal>
-              </texture>
-              <blend>
-                <min_height>0</min_height>
-                <fade_dist>0</fade_dist>
-              </blend>
-            </heightmap>
-          </geometry>
-          <max_contacts>10</max_contacts>
-          <surface>
-            <contact>
-              <ode />
-            </contact>
-            <bounce />
-            <friction>
-              <torsional>
-                <ode />
-              </torsional>
-              <ode />
-            </friction>
-          </surface>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <heightmap>
-              <texture>
-                <diffuse>file://media/materials/textures/dirt_diffusespecular.png</diffuse>
-                <normal>file://media/materials/textures/flat_normal.png</normal>
-                <size>5</size>
-              </texture>
-              <texture>
-                <diffuse>file://media/materials/textures/grass_diffusespecular.png</diffuse>
-                <normal>file://media/materials/textures/flat_normal.png</normal>
-                <size>5</size>
-              </texture>
-              <texture>
-                <diffuse>file://media/materials/textures/fungus_diffusespecular.png</diffuse>
-                <normal>file://media/materials/textures/flat_normal.png</normal>
-                <size>20</size>
-              </texture>
-              <blend>
-                <min_height>15</min_height>
-                <fade_dist>5</fade_dist>
-              </blend>
-              <blend>
-                <min_height>30</min_height>
-                <fade_dist>10</fade_dist>
-              </blend>
-              <uri>model://vrc_driving_terrain/materials/textures/heightmap.png</uri>
-              <size>500 500 118</size>
-              <pos>0 0 -15</pos>
-            </heightmap>
-          </geometry>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-      <link name="grass_plane">
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>500 500</size>
-            </plane>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>0.5</mu>
-                <mu2>0.5</mu2>
-              </ode>
-              <torsional>
-                <ode />
-              </torsional>
-            </friction>
-            <contact>
-              <ode />
-            </contact>
-            <bounce />
-          </surface>
-          <max_contacts>10</max_contacts>
-        </collision>
-        <visual name="visual_0">
-          <pose>0 0 0 0 -0 0</pose>
-          <cast_shadows>0</cast_shadows>
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>500 500</size>
-            </plane>
-          </geometry>
-          <material>
-            <script>
-              <uri>model://vrc_driving_terrain/materials/scripts</uri>
-              <uri>model://vrc_driving_terrain/materials/textures</uri>
-              <name>vrc/grass</name>
-            </script>
-          </material>
-        </visual>
-        <self_collide>0</self_collide>
-        <enable_wind>0</enable_wind>
-        <kinematic>0</kinematic>
-      </link>
-      <pose>-1.85429 1.11669 0 0 -0 0</pose>
-    </model>
-    
+
+    <!-- === CLEAN TERRAIN MODEL ===
+         Only one copy, no ground_plane, no file://media.
+    -->
+    <include>
+      <uri>model://vrc_driving_terrain</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+  
 <model name="big_oak_tree">
       <static>1</static>
       <link name="link">
