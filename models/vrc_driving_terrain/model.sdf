@@ -1,53 +1,38 @@
 <?xml version="1.0" ?>
-<sdf version="1.5">
+<sdf version="1.8">
   <model name="vrc_driving_terrain">
     <static>true</static>
     <link name="link">
       <collision name="collision">
         <geometry>
           <heightmap>
-            <uri>model://vrc_driving_terrain/materials/textures/heightmap.png</uri>
+            <uri>file://home/lachlanpartridge/Robotics-Studio-1/models/vrc_driving_terrain/materials/textures/heightmap.png</uri>
             <size>500 500 118</size>
             <pos>0 0 -15</pos>
+            <sampling>1</sampling>
           </heightmap>
         </geometry>
       </collision>
       <visual name="visual">
         <geometry>
           <heightmap>
-            <!-- TEXTURES FIRST (like the original that worked) -->
-            <texture>
-              <diffuse>model://vrc_driving_terrain/materials/textures/grass_dry.png</diffuse>
-              <normal>model://vrc_driving_terrain/materials/textures/flat_normal.png</normal>
-              <size>12</size>
-            </texture>
-            <texture>
-              <diffuse>model://vrc_driving_terrain/materials/textures/grass_dry.png</diffuse>
-              <normal>model://vrc_driving_terrain/materials/textures/flat_normal.png</normal>
-              <size>12</size>
-            </texture>
-            <texture>
-              <diffuse>model://vrc_driving_terrain/materials/textures/grass_dry.png</diffuse>
-              <normal>model://vrc_driving_terrain/materials/textures/flat_normal.png</normal>
-              <size>12</size>
-            </texture>
-            <blend>
-              <min_height>15</min_height>
-              <fade_dist>5</fade_dist>
-            </blend>
-            <blend>
-              <min_height>30</min_height>
-              <fade_dist>10</fade_dist>
-            </blend>
-
-            <!-- URI/LAYOUT LAST (exactly like the original working model) -->
-            <uri>model://vrc_driving_terrain/materials/textures/heightmap.png</uri>
+            <uri>file:///home/lachlanpartridge/Robotics-Studio-1/models/vrc_driving_terrain/materials/textures/heightmap.png</uri>
             <size>500 500 118</size>
             <pos>0 0 -15</pos>
+            <sampling>1</sampling>
           </heightmap>
         </geometry>
+        <material>
+          <pbr>
+            <metal>
+              <albedo_map>file:///home/lachlanpartridge/Robotics-Studio-1/models/vrc_driving_terrain/materials/textures/grass_dry.png</albedo_map>
+              <normal_map>file:///home/lachlanpartridge/Robotics-Studio-1/models/vrc_driving_terrain/materials/textures/flat_normal.png</normal_map>
+              <metalness>0.0</metalness>
+              <roughness>0.8</roughness>
+            </metal>
+          </pbr>
+        </material>
       </visual>
     </link>
-
   </model>
 </sdf>
