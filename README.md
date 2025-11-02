@@ -15,6 +15,9 @@ Simple demo with GUI
 With SLAM + Navigation + RViz + Large demo (change to simple_trees for smaller enviroment)
     ros2 launch trailblazer mission.launch.py slam:=true nav2:=true rviz:=true world:=large_demo gui:=true
 
+Lachlan's Enviroment
+    ros2 launch trailblazer mission.launch.py world:=test_terrain
+
 Run just the GUI
     python3 gui.node.py
 
