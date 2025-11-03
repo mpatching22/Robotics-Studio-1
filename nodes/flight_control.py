@@ -10,8 +10,17 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32MultiArray
 
-import tf_transformations as tft  # For quaternion to rotation matrix
+# --- Minimal quaternion helpers (avoid external tf_transformations dependency) ---
+def _quat_to_yaw(qx, qy, qz, qw) -> float:
+    # yaw (Z-axis rotation) from quaternion
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    return math.atan2(siny_cosp, cosy_cosp)
 
+def _yaw_rot2x2(yaw):
+    c, s = math.cos(yaw), math.sin(yaw)
+    return np.array([[c, -s],
+                     [s,  c]])
 GUI_TO_CMD = {
     "HOVER": "hover",
     "MOVE TO GOAL": "move_to_goal",
@@ -40,6 +49,7 @@ class FlightControl(Node):
         # Publishers
         self.pub_status  = self.create_publisher(String, '/movement/status', 10)
         self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)
+        
         self.pub_goal_dist = self.create_publisher(Float32, '/goal/distance', 10)
         self.pub_goal_time = self.create_publisher(Float32, '/goal/time', 10)
 
@@ -102,8 +112,7 @@ class FlightControl(Node):
 
     def get_yaw_from_pose(self, pose):
         q = pose.orientation
-        _, _, yaw = tft.euler_from_quaternion([q.x, q.y, q.z, q.w])
-        return yaw
+        return _quat_to_yaw(q.x, q.y, q.z, q.w)
 
     def on_sectors(self, msg: Float32MultiArray):
         self.sector_mins = msg.data
@@ -286,8 +295,10 @@ class FlightControl(Node):
             sector_angles = [(i + 0.5) * sector_width for i in range(nsec)]
 
             q = [self.current_pose.orientation.x, self.current_pose.orientation.y,
-                 self.current_pose.orientation.z, self.current_pose.orientation.w]
-            rot = tft.quaternion_matrix(q)[0:2, 0:2]
+                self.current_pose.orientation.z, self.current_pose.orientation.w]
+            yaw = self.get_yaw_from_pose(self.current_pose)
+            rot = _yaw_rot2x2(yaw)
+
 
             for i in range(nsec):
                 d = self.sector_mins[i]
@@ -398,7 +409,6 @@ class FlightControl(Node):
         self.velX = float(t.linear.x)
         self.velY = float(t.linear.y)
         self.velZ = float(t.linear.z)
-
 
 def main(args=None):
     rclpy.init(args=args)

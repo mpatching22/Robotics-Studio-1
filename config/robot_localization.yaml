@@ -1,25 +1,34 @@
-### ekf config file ###
+# trailblazer/config/robot_localization.yaml
 robot_localization:
-    ros__parameters:
-        frequency: 30.0
-        two_d_mode: true
-        publish_acceleration: false
-        publish_tf: true
-        map_frame: map
-        odom_frame: odom
-        base_link_frame: base_link
-        world_frame: odom
+  ros__parameters:
+    use_sim_time: true
+    frequency: 50.0
+    two_d_mode: true
 
-        odom0: odometry
-        odom0_config: [false, false, false,
-                      false, false, false,
-                      true, true, false,
-                      false, false, true,
-                      false, false, false]
+    publish_tf: true
+    publish_acceleration: false
 
-        imu0: imu
-        imu0_config: [false, false, false,
-                      false, false, false,
-                      false, false, false,
-                      false, false, true,
-                      false, false, false]
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom        # EKF publishes odom -> base_link
+
+    # Odometry input from the bridge (ABSOLUTE NAME!)
+    odom0: /odometry
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, true,
+                   false, false, false]
+    odom0_differential: false
+    odom0_relative:     false
+
+    # If (and only if) you actually have an IMU topic, uncomment and set it ABSOLUTE:
+    # imu0: /imu
+    # imu0_config: [false, false, false,
+    #               false, false, false,
+    #               false, false, false,
+    #               false, false, true,
+    #               false, false, false]
+    # imu0_differential: false
+    # imu0_relative:     false

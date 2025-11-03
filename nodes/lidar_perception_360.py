@@ -93,7 +93,7 @@ class LidarPerception360(Node):
             "Sectors(min m): " + ", ".join(f"{v:.1f}" for v in sector_mins)
         )
         self.pub_status.publish(String(data=status))
-        self.get_logger().info(status)
+        # self.get_logger().info(status)
 
         # RViz markers
         self.pub_markers.publish(self._make_markers(msg, sector_mins, step, i_min, d_min, a_min))
