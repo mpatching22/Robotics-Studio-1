@@ -36,8 +36,6 @@ class GuiNode(Node):
 
         # Single publisher
         self.pub_cmd = self.create_publisher(String, '/cmd/control', 10)
-
-        self.pub_nav_goal = self.create_publisher(PoseStamped, '/goal_pose', 10)
         
         # Subscriber to movement status
         self.sub_status = self.create_subscription(
@@ -57,6 +55,10 @@ class GuiNode(Node):
 
         self.sub_pose_ps = self.create_subscription(
             PoseStamped, '/drone/pose_1hz', self.pose_callback_ps, 10
+        )
+        
+        self.sub_hag = self.create_subscription(
+            Float32, '/altitude/hag', self.hag_cb, 10
         )
                 
         self.sub_goal_dist = self.create_subscription(
@@ -80,6 +82,10 @@ class GuiNode(Node):
         if hasattr(self, 'gui_ref') and self.gui_ref:
             # seconds as float; GUI formats to mm:ss
             self.gui_ref.goal_eta_signal.emit(float(msg.data))
+    def hag_cb(self, msg: Float32):
+        if hasattr(self, 'gui_ref') and self.gui_ref:
+            # allow NaN to show as "—"
+            self.gui_ref.hag_signal.emit(float(msg.data))
 
     def camera_cb(self, msg: Image):
         try:
@@ -115,29 +121,17 @@ class GuiNode(Node):
             self.get_logger().warn(f'Camera conversion failed: {e}')
 
     # convenience methods to publish from GUI
-    def publish_goal(self, x: float, y: float, z: float):
+    def publish_goal(self, x: float, y: float):
         msg = PointStamped()
-        msg.header.frame_id = 'map'      # adjust if you use a different frame
-        msg.point.x, msg.point.y, msg.point.z = x, y, z
+        msg.header.frame_id = 'map'
+        msg.point.x, msg.point.y, msg.point.z = x, y, 0.0
         self.pub_goal.publish(msg)
-        self.get_logger().info(f"Published /cmd/goal: ({x}, {y}, {z})")
+        self.get_logger().info(f"Published /cmd/goal: ({x}, {y})")
+
 
     def publish_height(self, h: float):
         self.pub_height.publish(Float32(data=float(h)))
         self.get_logger().info(f"Published /cmd/height: {h}")
-
-
-    def publish_nav2_goal(self, x: float, y: float, z: float):
-        goal = PoseStamped()
-        goal.header.stamp = self.get_clock().now().to_msg()
-        goal.header.frame_id = 'map'      # Nav2 expects map or global frame
-        goal.pose.position.x = float(x)
-        goal.pose.position.y = float(y)
-        goal.pose.position.z = float(z)
-        goal.pose.orientation.w = 1.0     # facing irrelevant for a drone; set identity
-        self.pub_nav_goal.publish(goal)
-        self.get_logger().info(f"Published /goal_pose (Nav2): ({x}, {y}, {z})")
-
     
 class TwoPaneGUI(QWidget):
     status_signal = Signal(str)   # <--- Qt signal carrying status text
@@ -145,6 +139,7 @@ class TwoPaneGUI(QWidget):
     goal_eta_signal  = Signal(float)
     camera_signal    = Signal(object)  # numpy/cv2 frame
     pose_signal   = Signal(float, float, float)  # X, Y, Z
+    hag_signal = Signal(float)
     camera_signal = Signal(object)               # cv2 frame (numpy array)
 
 
@@ -157,6 +152,7 @@ class TwoPaneGUI(QWidget):
         self.camera_signal.connect(self.update_camera_view)
         self.status_signal.connect(self.update_status_box)
         self.pose_signal.connect(self.update_current_position)
+        self.hag_signal.connect(self.update_hag_box)
         self.camera_signal.connect(self.update_camera_view)
 
 
@@ -192,7 +188,7 @@ class TwoPaneGUI(QWidget):
                 padding-top: 16px;
             }
 
-            #btnHalt    { background: #D9C40A; }
+            #btnHover    { background: #D9C40A; }
             #btnMove    { background: #64B32D; }
             #btnLand    { background: #F06A1A; }
             #btnTakeoff { background: #0C8F24; }
@@ -320,6 +316,30 @@ class TwoPaneGUI(QWidget):
         pos_v.addWidget(self.pos_box, 0, Qt.AlignHCenter)
         left.addWidget(pos_container, 0, Qt.AlignHCenter)
 
+        # --- Height Based off LIDAR ---
+        hag_container = QWidget()
+        hag_v = QVBoxLayout(hag_container)
+        hag_v.setContentsMargins(8, 6, 8, 6)
+        hag_v.setSpacing(1)
+
+        hag_lbl = QLabel("Height Based off LIDAR")
+        hag_lbl.setObjectName("statusLabel")
+        hag_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+
+        self.hag_box = QFrame()
+        self.hag_box.setObjectName("miniBox")
+        self.hag_box.setFixedSize(260, 60)
+
+        self.hag_text = QLabel("— m")
+        self.hag_text.setAlignment(Qt.AlignCenter)
+        _hag_box_layout = QVBoxLayout(self.hag_box)
+        _hag_box_layout.setContentsMargins(4,4,4,4)
+        _hag_box_layout.addWidget(self.hag_text, 0, Qt.AlignCenter)
+
+        hag_v.addWidget(hag_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
+        hag_v.addWidget(self.hag_box, 0, Qt.AlignHCenter)
+        left.addWidget(hag_container, 0, Qt.AlignHCenter)
+
 
         # --- Distance to Goal ---
         dist_container = QWidget()
@@ -381,7 +401,7 @@ class TwoPaneGUI(QWidget):
 
         self.video_box = QFrame()
         self.video_box.setObjectName("videoBox")
-        self.video_box.setFixedSize(260, 180)
+        self.video_box.setFixedSize(260, 120)
 
         self.video_placeholder = QLabel("No Video")
         self.video_placeholder.setAlignment(Qt.AlignCenter)
@@ -439,7 +459,7 @@ class TwoPaneGUI(QWidget):
         inputs.setSpacing(10)
 
         # --- Enter Goal: X Y Z + SET GOAL ---
-        goal_row_label = QLabel("Enter Goal")
+        goal_row_label = QLabel("Enter Goal (X, Y)")
         goal_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         goal_row_label.setMinimumHeight(24)
         inputs.addWidget(goal_row_label)
@@ -447,7 +467,6 @@ class TwoPaneGUI(QWidget):
         goal_row = QHBoxLayout()
         goal_row.setSpacing(12)
 
-        # Small helper to build a 48x48 QLineEdit centered text
         def make_cell(placeholder):
             le = QLineEdit()
             le.setFixedSize(64, 48)
@@ -457,14 +476,12 @@ class TwoPaneGUI(QWidget):
 
         self.goal_x_edit = make_cell("X")
         self.goal_y_edit = make_cell("Y")
-        self.goal_z_edit = make_cell("Z")
 
         goal_row.addWidget(self.goal_x_edit)
         goal_row.addWidget(self.goal_y_edit)
-        goal_row.addWidget(self.goal_z_edit)
 
         self.btn_set_goal = QPushButton("SET GOAL")
-        self.btn_set_goal.setObjectName("btnMove")   # reuse green style
+        self.btn_set_goal.setObjectName("btnMove")
         self.btn_set_goal.setMinimumHeight(48)
         goal_row.addWidget(self.btn_set_goal, 1)
 
@@ -525,14 +542,15 @@ class TwoPaneGUI(QWidget):
         # Put the inputs above the grid of big buttons
         right.addLayout(inputs)
 
-        # Row 1: HALT | MOVE TO GOAL
+        # Row 1: HOVER | MOVE TO GOAL
         row1 = QHBoxLayout(); row1.setSpacing(18)
-        btn_halt = QPushButton("HALT");         btn_halt.setObjectName("btnHalt");   config_btn(btn_halt)
-        btn_move = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   config_btn(btn_move)
+        btn_hover = QPushButton("HOVER");        btn_hover.setObjectName("btnHover"); config_btn(btn_hover)
+        btn_move  = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   config_btn(btn_move)
         # Equal widths across the row:
-        row1.addWidget(btn_halt, 1)
+        row1.addWidget(btn_hover, 1)
         row1.addWidget(btn_move, 1)
         grid_col.addLayout(row1)
+
 
         # Row 2: LAND | TAKEOFF
         row2 = QHBoxLayout(); row2.setSpacing(18)
@@ -563,7 +581,7 @@ class TwoPaneGUI(QWidget):
         def _hook(btn_text, color_hex):
             return lambda: (self.ros_node.send(btn_text), self.update_last_command(btn_text, color_hex))
         
-        btn_halt.clicked.connect(_hook("HALT", "#D9C40A"))
+        btn_hover.clicked.connect(_hook("HOVER", "#D9C40A"))
         btn_move.clicked.connect(_hook("MOVE TO GOAL", "#64B32D"))
         btn_land.clicked.connect(_hook("LAND", "#F06A1A"))
         btn_take.clicked.connect(_hook("TAKEOFF", "#0C8F24"))
@@ -576,23 +594,11 @@ class TwoPaneGUI(QWidget):
         try:
             x = float(self.goal_x_edit.text())
             y = float(self.goal_y_edit.text())
-            z = float(self.goal_z_edit.text())
         except ValueError:
             return
-
-        # Keep your original app topic (for your FC UI/state)
-        self.ros_node.publish_goal(x, y, z)
-
-        # New: actually drive Nav2 XY via /goal_pose
-        self.ros_node.publish_nav2_goal(x, y, z)
-
-        # New: set Z target for the altitude mixer
-        self.ros_node.publish_height(z)
-
-        # reflect back in the boxes
+        self.ros_node.publish_goal(x, y)
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
-        self.goal_z_edit.setText(f"{z:.2f}")
 
 
     def set_height(self):
@@ -612,18 +618,21 @@ class TwoPaneGUI(QWidget):
         )
 
     def update_status_box(self, status: str):
+        status_key = status.strip().lower()
         mapping = {
-            "Pre Flight Checks": ("PRE-FLIGHT", "#CCCCCC"), # grey
-            "Landed":       ("LANDED", "#F06A1A"),   # orange
-            "Landing":      ("LANDING", "#C75610"),  # darker orange
-            "Taking off":   ("TAKING OFF", "#0C8F24"), # dark green
-            "Halted":       ("HALTED", "#D9C40A"),   # yellow
-            "Moving to goal": ("MOVING TO GOAL", "#64B32D"), # light green
-            "Arrived at goal": ("ARRIVED AT GOAL", "#1A73E8"), # blue
-            "Emergency Landing": ("EMERGENCY LANDING", "#CF1C12"), # 🔴 red
+            "pre flight checks": ("PRE-FLIGHT", "#CCCCCC"),
+            "landed":            ("LANDED", "#F06A1A"),
+            "landing":           ("LANDING", "#C75610"),
+            "taking off":        ("TAKING OFF", "#0C8F24"),
+            "hovering":          ("HOVERING", "#D9C40A"),
+            "moving to goal":    ("MOVING TO GOAL", "#64B32D"),
+            "arrived at goal":   ("ARRIVED AT GOAL", "#1A73E8"),
+            "emergency landing": ("EMERGENCY LANDING", "#CF1C12"),
         }
 
-        text, color = mapping.get(status, (status.upper(), "#CCCCCC"))
+
+        text, color = mapping.get(status_key, (status.upper(), "#CCCCCC"))
+
 
         self.status_text.setText(text)
         self.status_box.setStyleSheet(
@@ -631,11 +640,10 @@ class TwoPaneGUI(QWidget):
         )
 
     
-    def update_goal_position(self, x: float, y: float, z: float):
-        # show the current goal in the Enter Goal fields (still editable)
+    def update_goal_position(self, x: float, y: float, z_unused: float = 0.0):
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
-        self.goal_z_edit.setText(f"{z:.2f}")
+
 
 
     def update_goal_distance(self, meters: float):
@@ -663,6 +671,11 @@ class TwoPaneGUI(QWidget):
             m = (secs % 3600) // 60
             self.time_text.setText(f"{h} h {m} m")
 
+    def update_hag_box(self, hag_m: float):
+        if hag_m != hag_m:  # NaN check
+            self.hag_text.setText("— m")
+        else:
+            self.hag_text.setText(f"{hag_m:.2f} m")
 
     def update_camera_view(self, frame):
         # frame is a cv2 BGR image (H x W x 3)

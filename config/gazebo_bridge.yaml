@@ -18,7 +18,7 @@
   ros_type_name: 'nav_msgs/msg/Odometry'
   gz_type_name: 'ignition.msgs.Odometry'
   direction: GZ_TO_ROS
-
+  
   #ros_topic_name: '/pose'
 - ros_topic_name: '/drone/pose'
   gz_topic_name: '/model/parrot/pose'
@@ -26,15 +26,8 @@
   gz_type_name: 'ignition.msgs.Pose'
   direction: GZ_TO_ROS
 
-# Intertial Measurement Unit
-- ros_topic_name: '/imu'
-  gz_topic_name: '/model/parrot/imu'
-  ros_type_name: 'sensor_msgs/msg/Imu'
-  gz_type_name: 'ignition.msgs.IMU'
-  direction: GZ_TO_ROS
-
 # Command velocity
-- ros_topic_name: '/cmd_vel'
+- ros_topic_name: '/cmd_vel_real'
   gz_topic_name: '/model/parrot/cmd_vel'
   ros_type_name: 'geometry_msgs/msg/Twist'
   gz_type_name: 'ignition.msgs.Twist'
@@ -73,4 +66,18 @@
   gz_topic_name: "/model/parrot/camera/points"
   ros_type_name: "sensor_msgs/msg/PointCloud2"
   gz_type_name: "ignition.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS
+
+#ros_topic_name: '/pose'
+- ros_topic_name: '/drone/pose'
+  gz_topic_name: '/model/parrot/pose'
+  ros_type_name: 'geometry_msgs/msg/PoseStamped'
+  gz_type_name: 'ignition.msgs.Pose'
+  direction: GZ_TO_ROS
+
+#Added 2D LIDAR
+- ros_topic_name: '/downscan'
+  gz_topic_name: '/model/parrot/downscan'
+  ros_type_name: 'sensor_msgs/msg/LaserScan'
+  gz_type_name: 'gz.msgs.LaserScan'
   direction: GZ_TO_ROS

@@ -25,12 +25,14 @@ def generate_launch_description():
     )
     use_sim_time = LaunchConfiguration('use_sim_time')
     ld.add_action(use_sim_time_launch_arg)
+    
     rviz_launch_arg = DeclareLaunchArgument(
         'rviz',
         default_value='False',
         description='Flag to launch RViz'
     )
     ld.add_action(rviz_launch_arg)
+
     nav2_launch_arg = DeclareLaunchArgument(
         'nav2',
         default_value='True',
@@ -53,36 +55,34 @@ def generate_launch_description():
                                       }])
     ld.add_action(robot_state_publisher_node)
 
-    # Publish odom -> base_link transform **using robot_localization**
     robot_localization_node = Node(
         package='robot_localization',
         executable='ekf_node',
-        name='robot_localization',
+        name='robot_localization',   # matches YAML top key
         output='screen',
-        parameters=[PathJoinSubstitution([config_path,
-                                          'robot_localization.yaml']),
-                    {'use_sim_time': use_sim_time}]
+        parameters=[
+            PathJoinSubstitution([config_path, 'robot_localization.yaml']),
+            {'use_sim_time': use_sim_time}  # this can stay; YAML also sets it to true
+        ]
     )
     ld.add_action(robot_localization_node)
 
     # Start Gazebo to simulate the robot in the chosen world
     world_launch_arg = DeclareLaunchArgument(
         'world',
-        default_value='simple_trees.sdf',
-        choices=['simple_trees.sdf', 'large_demo.sdf'],
-        description='Which world to load'
+        default_value='simple_trees',
+        description='Which world to load',
+        choices=['simple_trees', 'large_demo', 'test_terrain']
     )
     ld.add_action(world_launch_arg)
-
     gazebo = IncludeLaunchDescription(
         PathJoinSubstitution([FindPackageShare('ros_ign_gazebo'),
-                            'launch', 'ign_gazebo.launch.py']),
+                             'launch', 'ign_gazebo.launch.py']),
         launch_arguments={
-            'ign_args': [
-                PathJoinSubstitution([pkg_path, 'worlds', LaunchConfiguration('world')]),
-                ' -r'
-            ]
-        }.items()
+            'ign_args': [PathJoinSubstitution([pkg_path,
+                                               'worlds',
+                                               [LaunchConfiguration('world'), '.sdf']]),
+                         ' -r']}.items()
     )
     ld.add_action(gazebo)
 
@@ -92,7 +92,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '1.0'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '2.2'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -101,7 +101,7 @@ def generate_launch_description():
         package='ros_ign_bridge',
         executable='parameter_bridge',
         parameters=[{'config_file': PathJoinSubstitution([config_path,
-                                                          'gazebo_bridge.yaml']), 
+                                                          'gazebo_bridge.yaml']),
                     'use_sim_time': use_sim_time}]
     )
     ld.add_action(gazebo_bridge)
@@ -135,6 +135,7 @@ def generate_launch_description():
         executable='pose_relay.py',
         name='pose_relay',
         output='screen',
+        namespace='rs1',
         parameters=[{
             'source_topic': '/odometry',     # or '/odometry'
             'source_type': 'odom',             # 'odom' if using /odometry
@@ -145,10 +146,25 @@ def generate_launch_description():
     )
     ld.add_action(pose_relay)
 
+    altitude_lidar = Node(
+        package='trailblazer',
+        executable='altitude_lidar.py',
+        name='altitude_lidar',
+        output='screen',
+        namespace='rs1',
+        parameters=[{
+            'scan_topic': '/downscan',
+            'center_deg': 0.0,   # 0 = straight down (assuming your rotation)
+            'window_deg': 5.0
+        }]
+    )
+    ld.add_action(altitude_lidar)
+
     gui_node = Node(
         package='trailblazer',
         executable='gui_node.py',    
         name='trailblazer_gui',
+        namespace='rs1',
         output='screen'
     )
     ld.add_action(gui_node)
@@ -158,28 +174,11 @@ def generate_launch_description():
         executable='flight_control.py',   # must match installed filename
         name='flight_control',
         output='screen',
+        namespace='rs1',
         parameters=[{
             'control_rate_hz': 10.0
         }]
     )
     ld.add_action(flight_control_node)
-
-    altitude_mixer_node = Node(
-        package='trailblazer',
-        executable='altitude_mixer.py',
-        name='altitude_mixer',
-        output='screen',
-        parameters=[{
-            'rate_hz': 20.0,
-            'kp_z': 1.2,
-            'kd_z': 0.8,
-            'max_up': 1.5,
-            'max_down': 1.0,
-            'deadband': 0.05,
-            'use_odom': True
-        }]
-    )
-    ld.add_action(altitude_mixer_node)
-
 
     return ld
