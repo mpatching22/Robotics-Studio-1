@@ -92,7 +92,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-        arguments=['-topic', '/robot_description', '-z', '0.2'] # z is height above ground
+        arguments=['-topic', '/robot_description', '-z', '2.2'] # z is height above ground
     )
     ld.add_action(robot_spawner)
 
@@ -180,17 +180,5 @@ def generate_launch_description():
         }]
     )
     ld.add_action(flight_control_node)
-
-    # lidar_node = Node(
-    #     package='trailblazer', executable='lidar_perception_360.py', name='lidar_perception_360',
-    #     output='screen',
-    #     parameters=[{
-    #         'scan_topic': '/scan',
-    #         'num_sectors': 8,
-    #         'front_sector_deg': 60.0,
-    #         'min_obs_dist': 3.0
-    #     }]
-    # )
-    # ld.add_action(lidar_node)
 
     return ld

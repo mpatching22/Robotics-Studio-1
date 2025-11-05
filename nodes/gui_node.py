@@ -121,12 +121,13 @@ class GuiNode(Node):
             self.get_logger().warn(f'Camera conversion failed: {e}')
 
     # convenience methods to publish from GUI
-    def publish_goal(self, x: float, y: float, z: float):
+    def publish_goal(self, x: float, y: float):
         msg = PointStamped()
-        msg.header.frame_id = 'map'      # adjust if you use a different frame
-        msg.point.x, msg.point.y, msg.point.z = x, y, z
+        msg.header.frame_id = 'map'
+        msg.point.x, msg.point.y, msg.point.z = x, y, 0.0
         self.pub_goal.publish(msg)
-        self.get_logger().info(f"Published /cmd/goal: ({x}, {y}, {z})")
+        self.get_logger().info(f"Published /cmd/goal: ({x}, {y})")
+
 
     def publish_height(self, h: float):
         self.pub_height.publish(Float32(data=float(h)))
@@ -458,7 +459,7 @@ class TwoPaneGUI(QWidget):
         inputs.setSpacing(10)
 
         # --- Enter Goal: X Y Z + SET GOAL ---
-        goal_row_label = QLabel("Enter Goal")
+        goal_row_label = QLabel("Enter Goal (X, Y)")
         goal_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         goal_row_label.setMinimumHeight(24)
         inputs.addWidget(goal_row_label)
@@ -466,7 +467,6 @@ class TwoPaneGUI(QWidget):
         goal_row = QHBoxLayout()
         goal_row.setSpacing(12)
 
-        # Small helper to build a 48x48 QLineEdit centered text
         def make_cell(placeholder):
             le = QLineEdit()
             le.setFixedSize(64, 48)
@@ -476,14 +476,12 @@ class TwoPaneGUI(QWidget):
 
         self.goal_x_edit = make_cell("X")
         self.goal_y_edit = make_cell("Y")
-        self.goal_z_edit = make_cell("Z")
 
         goal_row.addWidget(self.goal_x_edit)
         goal_row.addWidget(self.goal_y_edit)
-        goal_row.addWidget(self.goal_z_edit)
 
         self.btn_set_goal = QPushButton("SET GOAL")
-        self.btn_set_goal.setObjectName("btnMove")   # reuse green style
+        self.btn_set_goal.setObjectName("btnMove")
         self.btn_set_goal.setMinimumHeight(48)
         goal_row.addWidget(self.btn_set_goal, 1)
 
@@ -596,16 +594,12 @@ class TwoPaneGUI(QWidget):
         try:
             x = float(self.goal_x_edit.text())
             y = float(self.goal_y_edit.text())
-            z = float(self.goal_z_edit.text())
         except ValueError:
             return
-        # publish to /cmd/goal via your ROS node
-        self.ros_node.publish_goal(x, y, z)
-
-        # reflect locally so the Enter Goal fields keep the commanded values
+        self.ros_node.publish_goal(x, y)
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
-        self.goal_z_edit.setText(f"{z:.2f}")
+
 
     def set_height(self):
         try:
@@ -646,11 +640,10 @@ class TwoPaneGUI(QWidget):
         )
 
     
-    def update_goal_position(self, x: float, y: float, z: float):
-        # show the current goal in the Enter Goal fields (still editable)
+    def update_goal_position(self, x: float, y: float, z_unused: float = 0.0):
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
-        self.goal_z_edit.setText(f"{z:.2f}")
+
 
 
     def update_goal_distance(self, meters: float):

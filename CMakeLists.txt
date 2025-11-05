@@ -22,7 +22,6 @@ endif()
 
 # Install Python nodes (executables) into lib/${PROJECT_NAME}
 install(PROGRAMS
-  nodes/lidar_perception_360.py
   nodes/gui_node.py
   nodes/flight_control.py 
   nodes/pose_relay.py

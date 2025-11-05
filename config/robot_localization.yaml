@@ -24,11 +24,11 @@ robot_localization:
     odom0_relative:     false
 
     # If (and only if) you actually have an IMU topic, uncomment and set it ABSOLUTE:
-    # imu0: /imu
-    # imu0_config: [false, false, false,
-    #               false, false, false,
-    #               false, false, false,
-    #               false, false, true,
-    #               false, false, false]
-    # imu0_differential: false
-    # imu0_relative:     false
+    imu0: /imu
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative:     false

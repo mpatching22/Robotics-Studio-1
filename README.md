@@ -82,3 +82,7 @@ ros2 launch trailblazer mission.launch.py rviz:=False nav2:=True world:=test_ter
 
 
 rm -rf ~/.ignition ~/.gazebo ~/.gz
+
+Today we will try to get Nav2 and SLAM integrated with my flight control. Currently, flight control commands everything x y and z. However this is janky and requires a lot of custom code. The demo we got given has these toolboxes intergrated and I want to merge it with my flight control. 
+
+My first task is to remove the x and y control that fkight control has. So then Nav2 and SLAM can do this via RVIZ for now, later we will upgrade so flight control helps

@@ -27,7 +27,7 @@
   direction: GZ_TO_ROS
 
 # Command velocity
-- ros_topic_name: '/cmd_vel'
+- ros_topic_name: '/cmd_vel_real'
   gz_topic_name: '/model/parrot/cmd_vel'
   ros_type_name: 'geometry_msgs/msg/Twist'
   gz_type_name: 'ignition.msgs.Twist'
