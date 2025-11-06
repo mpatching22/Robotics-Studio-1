@@ -10,6 +10,8 @@ from geometry_msgs.msg import PoseStamped, PointStamped, Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float32MultiArray
 
+import os, csv, math, time
+
 # --- Minimal quaternion helpers ---
 def _quat_to_yaw(qx, qy, qz, qw) -> float:
     siny_cosp = 2.0 * (qw * qz + qx * qy)
@@ -107,6 +109,19 @@ class FlightControl(Node):
         self.sub_odom = self.create_subscription(Odometry, '/odometry', self.on_odom, 10)
         self.sub_sectors = self.create_subscription(Float32MultiArray, '/sector_mins', self.on_sectors, 10)
         self.sub_gap_info = self.create_subscription(Float32MultiArray, '/gap_info', self.on_gap_info, 10)
+        self.sub_hag = self.create_subscription(Float32, '/altitude/hag', self.on_hag, 10)
+        self.sub_hag_fwd = self.create_subscription(Float32, '/altitude/hag_forward', self.on_hag_forward, 10)
+
+
+        # Internal HAG storage
+        self.hag = None
+        self.hag_forward = None
+
+        # --- NEW: path recording state ---
+        self.record_active = False
+        self.record_rows = []         # list of (x, y, ground_z)
+        self._last_record_t = 0.0
+        self._record_rate_hz = 5.0    # CSV sampling rate
 
         # Internal state
         self.status = "Pre Flight Checks"
@@ -208,6 +223,9 @@ class FlightControl(Node):
 
     def on_goal(self, msg: PointStamped):
         self.goal_xyz = (float(msg.point.x), float(msg.point.y), 0.0)
+        self.record_active = True
+        self.record_rows = []
+        self._last_record_t = 0.0
         self._update_goal_metrics()
         self.get_logger().info(f"/cmd/goal: (x={self.goal_xyz[0]:.2f}, y={self.goal_xyz[1]:.2f})  [z ignored]")
 
@@ -377,6 +395,31 @@ class FlightControl(Node):
                 self.stuck_counter = 0
 
         return desired_yaw, speed_scale, vy_body
+        
+    def _desired_abs_z(self) -> float:
+        """
+        Desired absolute altitude using (ground_z_ahead + target_height).
+        Fallbacks:
+        - if no forward HAG: use current ground_z (z - hag)
+        - if no HAG at all:  use absolute target_height (legacy behavior)
+        """
+        tgt_hag = _desired_height(self.target_height)
+
+        if self.currentZ is None:
+            return tgt_hag  # can't do better
+
+        # If we have a forward preview, prefer that (terrain-following look-ahead)
+        if self.hag_forward is not None and self.hag_forward == self.hag_forward:  # checks NaN
+            ground_z_ahead = self.currentZ - float(self.hag_forward)
+            return ground_z_ahead + tgt_hag
+
+        # Else fall back to current ground
+        if self.hag is not None and self.hag == self.hag:
+            ground_z_now = self.currentZ - float(self.hag)
+            return ground_z_now + tgt_hag
+
+        # No HAG at all → legacy absolute
+        return tgt_hag
 
     def main_loop(self):
         if self.status == 'Pre Flight Checks':
@@ -398,6 +441,10 @@ class FlightControl(Node):
         else:
             self.set_status("Pre Flight Checks")
 
+        if self.record_active and self.status != 'Moving to Goal':
+            reached = ('Hover' in self.status) or ('Arrived' in self.status)
+            self._save_trace_csv(reached=reached)
+
     def pre_flight_checks(self):
         if self.currentZ is not None and self.currentZ < 0.5:
             self.set_status("Landed")
@@ -410,14 +457,14 @@ class FlightControl(Node):
             self.set_status('Taking off')
 
     def arrived_at_goal(self):
-        gz = _desired_height(self.target_height)
+        gz = self._desired_abs_z()
         vz = self._vz_hold(gz)
         self._cmd_vel(0.0, 0.0, vz)
         if self.last_cmd == 'land':
             self.set_status('Landing')
 
     def taking_off(self):
-        tgt = _desired_height(self.target_height)
+        tgt = self._desired_abs_z()
         if self.currentZ is None:
             self.zero_twist()
             return
@@ -433,17 +480,33 @@ class FlightControl(Node):
         self._cmd_vel(0.0, 0.0, vz)
 
     def moving_to_goal(self):
+        self.record_active = True
+
         if self.currentX is None or self.goal_xyz is None:
             vz = self._vz_hold(self.currentZ if self.currentZ is not None else 0.0)
             self._cmd_vel(0.0, 0.0, vz)
             return
+
+        now = self.get_clock().now().nanoseconds / 1e9
+        if self.record_active and self.currentX is not None and self.currentZ is not None:
+            if (now - self._last_record_t) >= (1.0 / self._record_rate_hz):
+                # ground_z = z - hag (prefer forward hag if present)
+                if self.hag_forward is not None and self.hag_forward == self.hag_forward:
+                    ground_z = self.currentZ - float(self.hag_forward)
+                elif self.hag is not None and self.hag == self.hag:
+                    ground_z = self.currentZ - float(self.hag)
+                else:
+                    ground_z = float('nan')
+                self.record_rows.append((float(self.currentX), float(self.currentY), float(ground_z)))
+                self._last_record_t = now
 
         gx, gy, _ = self.goal_xyz  # ignore goal z
         ex = gx - self.currentX
         ey = gy - self.currentY
 
         # Use set/desired height for vertical control
-        gz = _desired_height(self.target_height)
+        gz = self._desired_abs_z()
+        vz = self._vz_hold(gz)
         ez = gz - (self.currentZ if self.currentZ is not None else gz)
         ...
         # When publishing vertical velocity, use gz from desired height
@@ -451,6 +514,7 @@ class FlightControl(Node):
 
         # Check if goal reached
         if abs(ex) <= self.pos_tol_xy and abs(ey) <= self.pos_tol_xy and abs(ez) <= self.pos_tol_z:
+            self._save_trace_csv(reached=True)
             self.set_status('Arrived at Goal')
             self.pub_goal_dist.publish(Float32(data=0.0))
             self.pub_goal_time.publish(Float32(data=0.0))
@@ -535,6 +599,46 @@ class FlightControl(Node):
         self.velY = float(t.linear.y)
         self.velZ = float(t.linear.z)
 
+    def on_hag(self, msg: Float32):
+        self.hag = float(msg.data)
+
+    def on_hag_forward(self, msg: Float32):
+        self.hag_forward = float(msg.data)
+
+    def _save_trace_csv(self, reached: bool):\
+        
+        try:
+            self.record_active = False
+            if not self.record_rows:
+                self.get_logger().info("[trace] no samples recorded; skipping CSV write")
+                return
+
+            # Ensure data/ exists relative to the current working directory
+            outdir = os.path.join(os.getcwd(), 'data')
+            os.makedirs(outdir, exist_ok=True)
+
+            # Name file by end goal (or last pose if not reached)
+            if self.goal_xyz is not None:
+                gx, gy, _ = self.goal_xyz
+            else:
+                # fallback to last recorded XY
+                gx, gy, _gz = self.record_rows[-1]
+
+            fname = f"x{round(gx,2)}y{round(gy,2)}.csv"
+            # Clean filename (minus signs & dots are ok, spaces not expected)
+            path = os.path.join(outdir, fname.replace(' ', ''))
+
+            with open(path, 'w', newline='') as f:
+                w = csv.writer(f)
+                w.writerow(['x', 'y', 'height'])  # height = ground_z
+                for x, y, ground_z in self.record_rows:
+                    w.writerow([f"{x:.3f}", f"{y:.3f}", f"{ground_z:.3f}"])
+
+            self.get_logger().info(f"[trace] wrote {len(self.record_rows)} samples to {path}")
+        except Exception as e:
+            self.get_logger().error(f"[trace] failed to write CSV: {e}")
+        finally:
+            self.record_rows = []
 
 def main(args=None):
     rclpy.init(args=args)

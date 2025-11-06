@@ -46,7 +46,7 @@ Extra's
         ros2 daemon stop
         ros2 daemon start
 
-        ign topic -e -t /world/simple_trees/pose/info -n 1
+        ign topic -e -t /world/simple_trees/pose/info -n 1gti
 
 
 ## Micah's Readme

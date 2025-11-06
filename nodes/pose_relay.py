@@ -55,20 +55,20 @@ class PoseRelay(Node):
         # Timers
         timer_rate = max(self.rate, 0.1)
         self.timer = self.create_timer(1.0 / timer_rate, self._tick)
-        self.status_timer = self.create_timer(5.0, self._status_update)
+        # self.status_timer = self.create_timer(5.0, self._status_update)
 
-        self.get_logger().info(
-            f'Relaying [{self.source_type}] from "{src_topic}" -> "{out_topic}" at {self.rate:.2f} Hz'
-        )
-        self.get_logger().info(f'Timer period: {1.0 / timer_rate:.2f} s')
-        self.get_logger().info('Waiting for pose data...')
+        # self.get_logger().info(
+        #     f'Relaying [{self.source_type}] from "{src_topic}" -> "{out_topic}" at {self.rate:.2f} Hz'
+        # )
+        # self.get_logger().info(f'Timer period: {1.0 / timer_rate:.2f} s')
+        # self.get_logger().info('Waiting for pose data...')
 
     def _pose_cb(self, msg: PoseStamped):
         self.last_pose = msg
         self.message_count += 1
         if self.message_count <= 3:
             p = msg.pose.position
-            self.get_logger().info(f'Received pose #{self.message_count}: pos=({p.x:.2f},{p.y:.2f},{p.z:.2f}) frame={msg.header.frame_id}')
+            # self.get_logger().info(f'Received pose #{self.message_count}: pos=({p.x:.2f},{p.y:.2f},{p.z:.2f}) frame={msg.header.frame_id}')
 
     def _odom_cb(self, msg: Odometry):
         ps = PoseStamped()
@@ -92,10 +92,10 @@ class PoseRelay(Node):
         self.pub_pose.publish(out)
         self.pub_point.publish(pt)
 
-    def _status_update(self):
-        self.get_logger().info(
-            f'Status: Received {self.message_count} input msgs; last_pose: {"Available" if self.last_pose else "None"}'
-        )
+    # def _status_update(self):
+        # self.get_logger().info(
+        #     f'Status: Received {self.message_count} input msgs; last_pose: {"Available" if self.last_pose else "None"}'
+        # )
 
 
 def main():

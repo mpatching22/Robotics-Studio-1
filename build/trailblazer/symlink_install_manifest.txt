@@ -1,6 +1,5 @@
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/41068.rviz
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/gazebo_bridge.yaml
-/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/nav2_minimal.yaml
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/nav2_params.yaml
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/robot_localization.yaml
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/config/slam_params.yaml
@@ -46,6 +45,7 @@
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/pine_tree/model.config
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/pine_tree/model.sdf
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/worlds/final.sdf
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/worlds/final_terrain.sdf
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/worlds/large_demo.sdf
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/worlds/simple_trees.sdf
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/urdf_drone/common_properties.urdf.xacro

@@ -270,16 +270,16 @@ class LidarPerception360(Node):
         num_near = int(np.nansum(rng < near_thr))
         num_gaps = len(gaps)
         
-        status = (
-            f"Min: {d_min:.2f}m @ {math.degrees(a_min):.1f}°, "
-            f"Near(<{near_thr:.1f}m): {num_near}, "
-            f"Gaps: {num_gaps}, "
-            f"Sectors: {nsec}, "
-            "Sect(m): " + ", ".join(f"{v:.1f}" for v in sector_mins[:8])  # Show first 8
-        )
-        
-        self.pub_status.publish(String(data=status))
-        self.get_logger().info(status)
+        # status = (
+        #     f"Min: {d_min:.2f}m @ {math.degrees(a_min):.1f}°, "
+        #     f"Near(<{near_thr:.1f}m): {num_near}, "
+        #     f"Gaps: {num_gaps}, "
+        #     f"Sectors: {nsec}, "
+        #     "Sect(m): " + ", ".join(f"{v:.1f}" for v in sector_mins[:8])  # Show first 8
+        # )
+
+        # self.pub_status.publish(String(data=status))
+        # self.get_logger().info(status)
 
         # RViz markers
         self.pub_markers.publish(self._make_markers(msg, sector_mins, sector_angles, 

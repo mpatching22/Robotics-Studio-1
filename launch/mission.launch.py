@@ -72,9 +72,9 @@ def generate_launch_description():
         'world',
         default_value='final',
         description='Which world to load',
-        choices=['simple_trees', 'large_demo', 'final']
+        choices=['simple_trees', 'large_demo', 'final_terrain', 'final']
     )
-    
+
     ld.add_action(world_launch_arg)
     gazebo = IncludeLaunchDescription(
         PathJoinSubstitution([FindPackageShare('ros_ign_gazebo'),
@@ -125,7 +125,8 @@ def generate_launch_description():
                               'launch',
                               'navigation.launch.py']),
         launch_arguments={
-            'use_sim_time': use_sim_time
+            'use_sim_time': use_sim_time,
+            'log_level': 'error'    # <-- add this line
         }.items(),
         condition=IfCondition(LaunchConfiguration('nav2'))
     )
