@@ -7,7 +7,7 @@
 				{
 					"build" : ".",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-.-956c8318ea990dec6220.json",
+					"jsonFile" : "directory-.-Debug-d2694bc0c5d4c6190f13.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.12"
@@ -21,7 +21,7 @@
 					]
 				}
 			],
-			"name" : "",
+			"name" : "Debug",
 			"projects" : 
 			[
 				{
@@ -42,14 +42,14 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "trailblazer_uninstall::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-trailblazer_uninstall-90bb6ce3a4700bfbe18d.json",
+					"jsonFile" : "target-trailblazer_uninstall-Debug-70e0c6db061981d1a236.json",
 					"name" : "trailblazer_uninstall",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "uninstall::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-uninstall-41fb1f05e414e006268b.json",
+					"jsonFile" : "target-uninstall-Debug-91d50d11572654b0fa6f.json",
 					"name" : "uninstall",
 					"projectIndex" : 0
 				}
@@ -59,7 +59,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/home/mpatching/trailblazer/build/trailblazer",
+		"build" : "/home/mpatching/trailblazer/build",
 		"source" : "/home/mpatching/trailblazer"
 	},
 	"version" : 

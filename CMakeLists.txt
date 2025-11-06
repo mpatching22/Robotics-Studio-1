@@ -19,11 +19,7 @@ install(DIRECTORY
 install(PROGRAMS
   nodes/lidar_perception_360.py
   nodes/pose_relay.py
-  nodes/climb_controller.py
-  nodes/forward_10m_cli.py
-  nodes/minimal_drone_nav.py
   nodes/altitude_mixer.py
-  nodes/waypoint_planner.py
   nodes/flight_control.py
   nodes/gui_node.py
   DESTINATION lib/${PROJECT_NAME}

@@ -313,8 +313,8 @@ message(STATUS "Execute custom install script")
 # install(DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
 ament_cmake_symlink_install_directory("/home/mpatching/trailblazer" DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
 
-# install(PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/climb_controller.py" "nodes/forward_10m_cli.py" "nodes/minimal_drone_nav.py" "nodes/altitude_mixer.py" "nodes/waypoint_planner.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
-ament_cmake_symlink_install_programs("/home/mpatching/trailblazer" PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/climb_controller.py" "nodes/forward_10m_cli.py" "nodes/minimal_drone_nav.py" "nodes/altitude_mixer.py" "nodes/waypoint_planner.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
+# install(PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_mixer.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
+ament_cmake_symlink_install_programs("/home/mpatching/trailblazer" PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_mixer.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
 
 # install(FILES "/home/mpatching/trailblazer/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/home/mpatching/trailblazer" FILES "/home/mpatching/trailblazer/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
