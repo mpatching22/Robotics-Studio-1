@@ -1,1 +1,0 @@
-/home/mpatching/trailblazer/nodes/climb_controller.py

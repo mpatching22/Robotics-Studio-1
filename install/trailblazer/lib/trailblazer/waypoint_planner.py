@@ -1,1 +1,0 @@
-/home/mpatching/trailblazer/nodes/waypoint_planner.py

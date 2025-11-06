@@ -1,6 +1,0 @@
-Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/mpatching/trailblazer -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/mpatching/trailblazer/install/trailblazer
-Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/mpatching/trailblazer -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/mpatching/trailblazer/install/trailblazer
-Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
-Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
-Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer
-Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer

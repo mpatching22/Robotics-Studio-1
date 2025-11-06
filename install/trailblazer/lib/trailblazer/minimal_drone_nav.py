@@ -1,1 +1,0 @@
-/home/mpatching/trailblazer/nodes/minimal_drone_nav.py

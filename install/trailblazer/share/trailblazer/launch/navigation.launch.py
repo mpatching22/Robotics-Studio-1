@@ -1,1 +1,1 @@
-/home/mpatching/trailblazer/launch/navigation.launch.py
+/home/jaydenhazell/rs1/launch/navigation.launch.py

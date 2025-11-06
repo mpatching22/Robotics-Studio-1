@@ -1,1 +1,1 @@
-/home/mpatching/trailblazer/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh
+/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh
