@@ -56,7 +56,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/trailblazer" TYPE PROGRAM FILES
     "/home/mpatching/trailblazer/nodes/lidar_perception_360.py"
     "/home/mpatching/trailblazer/nodes/pose_relay.py"
-    "/home/mpatching/trailblazer/nodes/altitude_mixer.py"
+    "/home/mpatching/trailblazer/nodes/altitude_lidar.py"
     "/home/mpatching/trailblazer/nodes/flight_control.py"
     "/home/mpatching/trailblazer/nodes/gui_node.py"
     )
