@@ -44,8 +44,8 @@ class LidarPerception360(Node):
         self.declare_parameter('outlier_threshold', 0.5)    # Meters - reject readings changing > this
         
         # Gap detection parameters
-        self.declare_parameter('min_gap_width_deg', 30.0)   # Minimum angular width for a gap
-        self.declare_parameter('min_gap_clearance', 3.0)    # Minimum clearance to consider as gap
+        self.declare_parameter('min_gap_width_deg', 10.0)   # Minimum angular width for a gap
+        self.declare_parameter('min_gap_clearance', 1.0)    # Minimum clearance to consider as gap
         self.declare_parameter('gap_search_range', 8.0)     # Max range to search for gaps
         
         # Adaptive resolution parameters
@@ -79,6 +79,22 @@ class LidarPerception360(Node):
         self.get_logger().info(f'Enhanced Perception online; listening to {scan_topic}')
         self.get_logger().info(f'Temporal filtering: {self.buffer_size} scans, Adaptive sectors: {self.enable_adaptive}')
 
+        # --- Debug controls (new) ---
+        self.declare_parameter('debug_level', 1)        # 0=off, 1=summary, 2=verbose
+        self.declare_parameter('debug_rate_hz', 1.0)    # print every N seconds
+        self.declare_parameter('status_preview_sectors', 8)  # show first N sector mins
+
+        self._dbg_level = int(self.get_parameter('debug_level').value)
+        self._dbg_dt    = 1.0 / max(0.1, float(self.get_parameter('debug_rate_hz').value))
+        self._t_last_dbg = 0.0
+        self._prev_front = float('nan')
+
+    def _d_ok(self, level=1): return self._dbg_level >= level
+    def _d_every(self, txt, level=1):
+        now = self.get_clock().now().nanoseconds / 1e9
+        if self._d_ok(level) and (now - self._t_last_dbg) >= self._dbg_dt:
+            self.get_logger().info(txt)
+            self._t_last_dbg = now
 
     def _temporal_filter(self, rng):
         """Apply temporal filtering to reduce noise and outliers"""
@@ -243,7 +259,7 @@ class LidarPerception360(Node):
 
         # ADAPTIVE SECTOR RESOLUTION
         sector_mins, sector_angles, nsec = self._adaptive_sector_resolution(ang, rng)
-        
+
         arr = Float32MultiArray()
         arr.data = sector_mins
         self.pub_sectors.publish(arr)
@@ -251,6 +267,18 @@ class LidarPerception360(Node):
         # GAP DETECTION
         gaps = self._detect_gaps(ang, rng)
         
+        # Throttled human-readable snapshot
+        N = int(self.get_parameter('status_preview_sectors').value)
+        sect_preview = sector_mins[:N]
+        num_gaps = len(gaps)
+        status = (
+            f"LIDAR: front={front_dist:.2f}m min={d_min:.2f}m@{math.degrees(a_min):.0f}° "
+            f"gaps={num_gaps} secs={len(sector_mins)} "
+            "S[:{}]=".format(N) + ",".join(f"{v:.1f}" if math.isfinite(v) else "inf" for v in sect_preview)
+        )
+        self._d_every(status, level=1)
+        self.pub_status.publish(String(data=status))
+
         # Publish largest gap info
         if gaps:
             # Sort by gap clearance * width (prioritize both factors)

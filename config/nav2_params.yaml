@@ -1,48 +1,48 @@
-# amcl:
-#   ros__parameters:
-#     use_sim_time: True
-#     alpha1: 0.2
-#     alpha2: 0.2
-#     alpha3: 0.2
-#     alpha4: 0.2
-#     alpha5: 0.2
-#     base_frame_id: "base_link"
-#     beam_skip_distance: 0.5
-#     beam_skip_error_threshold: 0.9
-#     beam_skip_threshold: 0.3
-#     do_beamskip: false
-#     global_frame_id: "map"
-#     lambda_short: 0.1
-#     laser_likelihood_max_dist: 2.0
-#     laser_max_range: 100.0
-#     laser_min_range: -1.0
-#     laser_model_type: "likelihood_field"
-#     max_beams: 60
-#     max_particles: 2000
-#     min_particles: 500
-#     odom_frame_id: "odom"
-#     pf_err: 0.05
-#     pf_z: 0.99
-#     recovery_alpha_fast: 0.0
-#     recovery_alpha_slow: 0.0
-#     resample_interval: 1
-#     robot_model_type: "nav2_amcl::DifferentialMotionModel"
-#     save_pose_rate: 0.5
-#     sigma_hit: 0.2
-#     tf_broadcast: true
-#     transform_tolerance: 1.0
-#     update_min_a: 0.2
-#     update_min_d: 0.25
-#     z_hit: 0.5
-#     z_max: 0.05
-#     z_rand: 0.5
-#     z_short: 0.05
-#     scan_topic: scan
+amcl:
+  ros__parameters:
+    use_sim_time: True
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_link"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 100.0
+    laser_min_range: -1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
 
 bt_navigator:
   ros__parameters:
     use_sim_time: True
-    global_frame: odom
+    global_frame: map
     robot_base_frame: base_link
     odom_topic: /odom
     bt_loop_duration: 10
@@ -113,7 +113,6 @@ controller_server:
   ros__parameters:
     use_sim_time: True
     controller_frequency: 5.0
-    cmd_vel_topic: /nav/cmd_vel
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -145,7 +144,7 @@ controller_server:
       min_vel_x: 0.0
       min_vel_y: 0.0
       max_vel_x: 1.0
-      max_vel_y: 0.5
+      max_vel_y: 0.0
       max_vel_theta: 1.5
       min_speed_xy: 0.0
       max_speed_xy: 1.0
@@ -192,8 +191,8 @@ local_costmap:
       robot_base_frame: base_link
       use_sim_time: True
       rolling_window: true
-      width: 100
-      height: 100
+      width: 10
+      height: 10
       resolution: 0.05 
       footprint: "[ [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5], [-0.5, 0.5] ]"
       plugins: ["obstacle_layer", "inflation_layer"]
@@ -208,7 +207,7 @@ local_costmap:
         scan:
           topic: /scan
           max_obstacle_height: 2.0
-          clearing: false
+          clearing: True
           marking: True
           data_type: "LaserScan"
           raytrace_max_range: 20.0
@@ -225,13 +224,13 @@ global_costmap:
     ros__parameters:
       update_frequency: 5.0
       publish_frequency: 5.0
-      global_frame: odom
+      global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
       footprint: "[ [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5], [-0.5, 0.5] ]"
       resolution: 0.1
-      track_unknown_space: false
-      plugins: ["obstacle_layer", "inflation_layer"]
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -239,16 +238,16 @@ global_costmap:
         scan:
           topic: /scan
           max_obstacle_height: 2.0
-          clearing: false
+          clearing: True
           marking: True
           data_type: "LaserScan"
           raytrace_max_range: 20.0
           raytrace_min_range: 0.0
           obstacle_max_range: 10.0
           obstacle_min_range: 0.0
-      # static_layer:
-      #   plugin: "nav2_costmap_2d::StaticLayer"
-      #   map_subscribe_transient_local: True
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -277,7 +276,7 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
+      tolerance: 2.0
       use_astar: false
       allow_unknown: true
 

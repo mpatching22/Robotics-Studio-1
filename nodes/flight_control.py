@@ -1,453 +1,387 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import csv
 import math
+import time
+from pathlib import Path
+
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.action import ActionClient
 
 from std_msgs.msg import String, Float32
 from geometry_msgs.msg import PoseStamped, PointStamped, Twist
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float32MultiArray
+from nav2_msgs.action import NavigateToPose
 
-import os, csv, math, time
+from std_srvs.srv import Trigger                 # + NEW
+from action_msgs.msg import GoalStatusArray      # + NEW
 
-# --- Minimal quaternion helpers ---
-def _quat_to_yaw(qx, qy, qz, qw) -> float:
-    siny_cosp = 2.0 * (qw * qz + qx * qy)
-    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
-    return math.atan2(siny_cosp, cosy_cosp)
+from action_msgs.srv import CancelGoal
+from action_msgs.msg import GoalInfo  # (needed to build request)
 
-def _yaw_rot2x2(yaw):
-    c, s = math.cos(yaw), math.sin(yaw)
-    return np.array([[c, -s],
-                     [s,  c]])
+import os, csv, time
 
-def wrap_to_pi(a):
-    return (a + math.pi) % (2*math.pi) - math.pi
+DEFAULT_HEIGHT_M = 0.75  # or keep your preferred default
 
+def _desired_height(target_height: float | None) -> float:
+    return target_height if target_height is not None else DEFAULT_HEIGHT_M
+
+
+# -------------------- GUI command map --------------------
 GUI_TO_CMD = {
     "HOVER": "hover",
     "MOVE TO GOAL": "move_to_goal",
     "LAND": "land",
     "TAKEOFF": "takeoff",
     "EMERGENCY LAND": "emergency_land",
+    "START LOG": "start_log",
+    "STOP LOG": "stop_log",
 }
 
-STATUSES = [
-    "Pre Flight Checks",
-    "Landed",
-    "Hovering",
-    "Arrived at Goal",
-    "Taking off",
-    "Landing",
-    "Moving to Goal",
-    "Emergency Landing",
-]
+# -------------------- Defaults / Params --------------------
+DEFAULT_TAKEOFF_HEIGHT = 0.75     # per your spec
+DEFAULT_OUTPUT_CMD_TOPIC = '/cmd_vel_real'
+NAV2_CMD_TOPIC = '/cmd_vel'
+STATUS_TOPIC = '/movement/status'
 
-DEFAULT_HEIGHT_M = 1.0
+# -------------------- Helpers --------------------
+def _quat_to_yaw(qx, qy, qz, qw) -> float:
+    # yaw (Z-axis rotation) from quaternion
+    siny_cosp = 2.0 * (qw * qz + qx * qy)
+    cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+    return math.atan2(siny_cosp, cosy_cosp)
 
-def _desired_height(target_height: float | None) -> float:
-    return target_height if target_height is not None else DEFAULT_HEIGHT_M
-    
-    
+def clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
 class FlightControl(Node):
+    """
+    XY by Nav2, custom Z control:
+      - Send goal to Nav2 on 'MOVE TO GOAL'
+      - Subscribe to Nav2 /cmd_vel, inject linear.z, publish to /vel_cmd_real
+      - No lidar_perception_360 dependency (Nav2 + SLAM own the XY)
+      - State machine with per-state methods (clean structure kept)
+      - CSV logger on demand
+    """
+
+    # -------------------- init --------------------
     def __init__(self):
         super().__init__('flight_control')
-        self.get_logger().info("Flight Control Node Started")
 
-        # Publishers
-        self.pub_status  = self.create_publisher(String, '/movement/status', 10)
-        self.pub_cmd_vel = self.create_publisher(Twist, '/cmd_vel', 10)
+        # ---- publishers
+        self.pub_status    = self.create_publisher(String, STATUS_TOPIC, 10)
+        self.pub_cmd_real  = self.create_publisher(Twist, DEFAULT_OUTPUT_CMD_TOPIC, 10)
         self.pub_goal_dist = self.create_publisher(Float32, '/goal/distance', 10)
         self.pub_goal_time = self.create_publisher(Float32, '/goal/time', 10)
-        self.pub_debug = self.create_publisher(String, '/debug/flight_control', 10)
 
-        # Parameters
-        self.declare_parameter('control_rate_hz', 20.0)
-        self.declare_parameter('max_xy_speed', 1.5)
-        self.declare_parameter('max_z_up', 2.0)
-        self.declare_parameter('max_z_down', 1.0)
-        self.declare_parameter('kp_xy', 0.8)
-        self.declare_parameter('kp_z', 0.65)
-        self.declare_parameter('ki_z', 0.20)
-        self.declare_parameter('kp_attitude', 2.0)
-        self.declare_parameter('pos_tol_xy', 0.25)
-        self.declare_parameter('pos_tol_z', 0.15)
-        self.declare_parameter('rep_threshold', 2.5)
-        self.declare_parameter('k_rep', 3.0)
-        self.declare_parameter('k_yaw', 1.5)
-        self.declare_parameter('max_yaw_rate_deg', 45.0)
-        self.declare_parameter('safe_stopping_dist', 1.5)
-        self.declare_parameter('use_gap_navigation', True)
-        self.declare_parameter('gap_heading_window_deg', 30.0)
+        # ---- subscribers (GUI + pose)
+        self.sub_cmd    = self.create_subscription(String,       '/cmd/control',    self.on_cmd,    10)
+        self.sub_goal   = self.create_subscription(PointStamped, '/cmd/goal',       self.on_goal,   10)
+        self.sub_height = self.create_subscription(Float32,      '/cmd/height',     self.on_height, 10)
+        self.sub_pose_s = self.create_subscription(PoseStamped,  '/drone/pose_1hz', self.on_pose,   10)
+        self.sub_odom   = self.create_subscription(Odometry,     '/odometry',       self.on_odom,   10)
 
-        # Read params
-        self.ctrl_hz = float(self.get_parameter('control_rate_hz').value)
-        self.max_xy_speed = float(self.get_parameter('max_xy_speed').value)
-        self.max_z_up = float(self.get_parameter('max_z_up').value)
-        self.max_z_down = float(self.get_parameter('max_z_down').value)
-        self.kp_xy = float(self.get_parameter('kp_xy').value)
-        self.kp_z = float(self.get_parameter('kp_z').value)
-        self.ki_z = float(self.get_parameter('ki_z').value)
-        self.kp_attitude = float(self.get_parameter('kp_attitude').value)
-        self.pos_tol_xy = float(self.get_parameter('pos_tol_xy').value)
-        self.pos_tol_z = float(self.get_parameter('pos_tol_z').value)
-        self.rep_threshold = float(self.get_parameter('rep_threshold').value)
-        self.k_rep = float(self.get_parameter('k_rep').value)
-        self.k_yaw = float(self.get_parameter('k_yaw').value)
-        self.max_yaw_rate = math.radians(float(self.get_parameter('max_yaw_rate_deg').value))
-        self.safe_stopping_dist = float(self.get_parameter('safe_stopping_dist').value)
-        self.use_gap_nav = bool(self.get_parameter('use_gap_navigation').value)
-        self.gap_heading_window = math.radians(float(self.get_parameter('gap_heading_window_deg').value))
+        # ---- Nav2 incoming velocity (BEST_EFFORT typical)
+        qos_cmd = QoSProfile(depth=10,
+                             reliability=ReliabilityPolicy.BEST_EFFORT,
+                             history=HistoryPolicy.KEEP_LAST)
+        self.sub_nav2_cmd = self.create_subscription(Twist, NAV2_CMD_TOPIC, self._on_nav2_cmd, qos_cmd)
+        self.last_nav2_twist = Twist()
 
-        # Subscribers
-        self.sub_cmd = self.create_subscription(String, '/cmd/control', self.on_cmd, 10)
-        self.sub_goal = self.create_subscription(PointStamped, '/cmd/goal', self.on_goal, 10)
-        self.sub_height_s = self.create_subscription(Float32, '/cmd/height', self.on_height, 10)
-        self.sub_pose_s = self.create_subscription(PoseStamped, '/drone/pose_1hz', self.on_pose, 10)
-        self.sub_odom = self.create_subscription(Odometry, '/odometry', self.on_odom, 10)
-        self.sub_sectors = self.create_subscription(Float32MultiArray, '/sector_mins', self.on_sectors, 10)
-        self.sub_gap_info = self.create_subscription(Float32MultiArray, '/gap_info', self.on_gap_info, 10)
-        self.sub_hag = self.create_subscription(Float32, '/altitude/hag', self.on_hag, 10)
-        self.sub_hag_fwd = self.create_subscription(Float32, '/altitude/hag_forward', self.on_hag_forward, 10)
+        self.nav2_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
+
+        # NEW: CancelGoal client for when we don't have a handle yet
+        self.cancel_nav2_cli = self.create_client(CancelGoal, '/navigate_to_pose/_action/cancel')
 
 
-        # Internal HAG storage
+        # --- Lifecycle "is_active" service clients (non-blocking)
+        self.cli_nav_active = self.create_client(Trigger, '/lifecycle_manager_navigation/is_active')
+        self.cli_loc_active = self.create_client(Trigger, '/lifecycle_manager_localization/is_active')  # ok if absent
+
+        # Readiness flags flipped by async poller
+        self._nav_ready = False
+        self._loc_ready = True   # default to True so we don't block if there's no localization manager
+
+        # Poll readiness once per second (non-blocking)
+        self._readiness_timer = self.create_timer(1.0, self._poll_readiness)
+
+        # Nav2 NavigateToPose status subscription (to detect SUCCEEDED=4)
+        self.sub_nav_status = self.create_subscription(
+            GoalStatusArray, '/navigate_to_pose/_action/status', self._on_nav_status, 10
+        )
+        self._latest_nav_status = None
+
+        # --- Terrain HAG topics (for precise terrain-following Z)
+        self.sub_hag      = self.create_subscription(Float32, '/altitude/hag',         self.on_hag,        10)
+        self.sub_hag_fwd  = self.create_subscription(Float32, '/altitude/hag_forward', self.on_hag_forward,10)
+
+        # Store latest HAGs
         self.hag = None
         self.hag_forward = None
 
-        # --- NEW: path recording state ---
-        self.record_active = False
-        self.record_rows = []         # list of (x, y, ground_z)
-        self._last_record_t = 0.0
-        self._record_rate_hz = 5.0    # CSV sampling rate
+        # --- CSV trace state (original style)
+        self.record_active   = False
+        self.record_rows     = []     # list of (x, y, ground_z)
+        self._last_record_t  = 0.0
+        self._record_rate_hz = 5.0    # sample rate while Moving to Goal
 
-        # Internal state
-        self.status = "Pre Flight Checks"
-        self._last_status = None
-        self.last_cmd = None
+        # ---- parameters
+        self.declare_parameter('control_rate_hz', 20.0)
+        self.declare_parameter('max_z_up',       2.0)
+        self.declare_parameter('max_z_down',     1.0)
+        self.declare_parameter('kp_z',           0.65)
+        self.declare_parameter('ki_z',           0.20)
+        self.declare_parameter('pos_tol_xy',     0.25)
+        self.declare_parameter('pos_tol_z',      0.15)
 
-        self.target_height = DEFAULT_HEIGHT_M
-        self.goal_xyz = None
-        self.hover_z = None
+        self.ctrl_hz    = float(self.get_parameter('control_rate_hz').value)
+        self.max_z_up   = float(self.get_parameter('max_z_up').value)
+        self.max_z_down = float(self.get_parameter('max_z_down').value)
+        self.kp_z       = float(self.get_parameter('kp_z').value)
+        self.ki_z       = float(self.get_parameter('ki_z').value)
+        self.pos_tol_xy = float(self.get_parameter('pos_tol_xy').value)
+        self.pos_tol_z  = float(self.get_parameter('pos_tol_z').value)
 
-        self.current_pose = None
+        # ---- state / memory
+        self.status        = "Pre Flight Checks"
+        self._last_status  = None
+        self.last_cmd      = None
+
+        self.target_height = None
+        self.goal_xyz      = None  # (gx, gy, gz)
+        self.staged_goal_xy= None  # (gx, gy)
+
         self.currentX = None
         self.currentY = None
         self.currentZ = None
 
+        self.hover_z = None
+
+        # PID memory for Z hold
         self._int_z = 0.0
         self._int_z_max = 1.0
         self._last_ctrl_time = self.get_clock().now()
 
-        self.sector_mins = None
-        self.sector_angles = None
-        self.num_sectors = 8
-        self.gap_info = None
+        # Nav2 goal tracking
+        self._nav2_goal_handle = None
+        self._nav2_goal_active = False
 
-        self.velX = 0.0
-        self.velY = 0.0
-        self.velZ = 0.0
+        # CSV logging
+        self.record_active = False
+        self._record_rate_hz = 10.0
+        self._last_record_t = 0.0
+        self._csv_fp = None
+        self._csv_writer = None
+        self._log_dir = Path.home() / '.ros' / 'trailblazer_logs'
+        self._log_dir.mkdir(parents=True, exist_ok=True)
 
-        self.stuck_counter = 0
-
+        # loop + heartbeat
         self.timer = self.create_timer(1.0 / max(1.0, self.ctrl_hz), self.main_loop)
+        self._status_heartbeat = self.create_timer(3.0, self._republish_status)
+
         self.set_status(self.status)
-        self.get_logger().info(f'Control Rate: {self.ctrl_hz} Hz, Gap Navigation: {self.use_gap_nav}')
+        self.get_logger().info("FlightControl ready (Nav2 XY + custom Z → /vel_cmd_real).")
 
-    def get_yaw_from_pose(self, pose):
-        q = pose.orientation
-        return _quat_to_yaw(q.x, q.y, q.z, q.w)
-
-    def on_sectors(self, msg: Float32MultiArray):
-        """Updated sector callback with angle calculation"""
-        self.sector_mins = np.array(msg.data)
-        self.num_sectors = len(self.sector_mins)
-        
-        # Calculate sector angles (center of each sector)
-        sector_width = 2 * math.pi / self.num_sectors
-        self.sector_angles = np.array([(i + 0.5) * sector_width - math.pi for i in range(self.num_sectors)])
-
-    def on_gap_info(self, msg: Float32MultiArray):
-        """Receive best gap information from enhanced perception"""
-        if len(msg.data) >= 3:
-            self.gap_info = {
-                'angle': float(msg.data[0]),
-                'width': float(msg.data[1]),
-                'clearance': float(msg.data[2])
-            }
-
-    def clamp(self, x, lo, hi):
-        return lo if x < lo else hi if x > hi else x
+    # -------------------- utilities --------------------
+    def _republish_status(self):
+        self.pub_status.publish(String(data=self.status))
 
     def set_status(self, s: str):
-        if s != self._last_status:
+        prev = getattr(self, "_last_status", None)
+        if s != prev:
+            # leaving Moving to Goal → write CSV once
+            if prev == 'Moving to Goal' and s != 'Moving to Goal':
+                # consider 'Arrived at Goal' as reached=True, anything else still writes file
+                reached = (s == 'Arrived at Goal')
+                self._save_trace_csv(reached=reached)
+
             self._last_status = s
             self.status = s
-            msg = String()
-            msg.data = s
-            self.pub_status.publish(msg)
-            self.get_logger().info(f"Status: {s}")
+            self.pub_status.publish(String(data=s))
+            self.get_logger().info(f"[status] {s}")
+
 
     def zero_twist(self):
-        self.pub_cmd_vel.publish(Twist())
+        self.pub_cmd_real.publish(Twist())
 
-    def on_cmd(self, msg: String):
-        text = msg.data.strip().upper()
-        self.get_logger().info(f"/cmd/control: {text}")
-        if text in GUI_TO_CMD:
-            self.last_cmd = GUI_TO_CMD[text]
-        else:
-            self.last_cmd = text.lower()
-
-        if self.last_cmd == 'takeoff':
-            self.hover_z = None
-            self.set_status('Taking off')
-        elif self.last_cmd == 'move_to_goal':
-            self.hover_z = None
-            if self.currentZ is not None and self.currentZ > 0.3:
-                self.set_status('Moving to Goal')
-            else:
-                self.set_status('Taking off')
-        elif self.last_cmd == 'land':
-            self.hover_z = None
-            self.set_status('Landing')
-        elif self.last_cmd == 'hover':
-            self.target_height = None
-            self.hover_z = float(self.currentZ) if self.currentZ is not None else None
-            self.set_status('Hovering')
-        elif self.last_cmd == 'emergency_land':
-            self.hover_z = None
-            self.set_status('Emergency Landing')
-
-    def on_goal(self, msg: PointStamped):
-        self.goal_xyz = (float(msg.point.x), float(msg.point.y), 0.0)
-        self.record_active = True
-        self.record_rows = []
-        self._last_record_t = 0.0
-        self._update_goal_metrics()
-        self.get_logger().info(f"/cmd/goal: (x={self.goal_xyz[0]:.2f}, y={self.goal_xyz[1]:.2f})  [z ignored]")
-
-    def on_height(self, msg: Float32):
-        self.target_height = float(msg.data)
-        self.get_logger().info(f"Set height updated to {self.target_height:.2f} m")
-
-    def on_pose(self, msg: PoseStamped):
-        self.current_pose = msg.pose
-        self.currentX = float(msg.pose.position.x)
-        self.currentY = float(msg.pose.position.y)
-        self.currentZ = float(msg.pose.position.z)
-
-        if self.last_cmd == 'hover' and self.hover_z is None and self.currentZ is not None:
-            self.hover_z = float(self.currentZ)
-
-    def _vz_hold(self, target_z: float) -> float:
-        """Z-height hold with PI control"""
-        if self.currentZ is None:
-            return 0.0
-        now = self.get_clock().now()
-        dt = (now - self._last_ctrl_time).nanoseconds / 1e9
-        if dt <= 0.0 or dt > 1.0:
-            dt = 1.0 / self.ctrl_hz
-        self._last_ctrl_time = now
-        e = float(target_z - self.currentZ)
-        self._int_z += e * dt
-        if self.ki_z > 0.0:
-            max_i = self._int_z_max / self.ki_z
-            self._int_z = self.clamp(self._int_z, -max_i, max_i)
-        vz = self.kp_z * e + self.ki_z * self._int_z
-        if vz >= 0.0:
-            vz = self.clamp(vz, 0.0, self.max_z_up)
-        else:
-            vz = self.clamp(vz, -self.max_z_down, 0.0)
-        return float(vz)
-
-    def _cmd_vel(self, vx: float, vy: float, vz: float, yaw_rate: float = 0.0):
-        """Publish cmd_vel with clamping"""
-        tw = Twist()
-        tw.linear.x = float(self.clamp(vx, -self.max_xy_speed, self.max_xy_speed))
-        tw.linear.y = float(self.clamp(vy, -self.max_xy_speed, self.max_xy_speed))
-        tw.linear.z = float(vz)
-        tw.angular.z = float(self.clamp(yaw_rate, -self.max_yaw_rate, self.max_yaw_rate))
-        self.pub_cmd_vel.publish(tw)
-
-    def _get_min_obstacle_distance(self) -> float:
-        """Get minimum obstacle distance across all sectors"""
-        if self.sector_mins is None or len(self.sector_mins) == 0:
-            return float('inf')
-        return float(np.nanmin(self.sector_mins))
-
-    def _get_obstacle_repulsion(self) -> np.ndarray:
-        """
-        Compute repulsive force from obstacles in world frame
-        FIXED: Properly transform from sensor frame to world frame
-        """
-        rep = np.zeros(2)
-
-        if self.sector_mins is None or self.current_pose is None or len(self.sector_mins) == 0:
-            return rep
-
-        current_yaw = self.get_yaw_from_pose(self.current_pose)
-        rot = _yaw_rot2x2(current_yaw)
-
-        for i in range(len(self.sector_mins)):
-            d = self.sector_mins[i]
-            if d >= self.rep_threshold or not np.isfinite(d):
-                continue
-
-            # Get angle of this sector in LIDAR frame
-            a_lidar = self.sector_angles[i] if self.sector_angles is not None else (i + 0.5) * (2 * math.pi / len(self.sector_mins)) - math.pi
-
-            # Transform obstacle position to world frame
-            # obstacle in sensor frame
-            px_sensor = d * math.cos(a_lidar)
-            py_sensor = d * math.sin(a_lidar)
-
-            # Transform to world frame
-            p_sensor = np.array([px_sensor, py_sensor])
-            p_world = np.dot(rot, p_sensor) + np.array([self.currentX, self.currentY])
-
-            # Direction from obstacle to drone
-            dir_vec = np.array([self.currentX, self.currentY]) - p_world
-            dist = np.linalg.norm(dir_vec)
-
-            if dist > 0.01:
-                rep_mag = self.k_rep * ((1.0 / d) - (1.0 / self.rep_threshold)) ** 2
-                rep_dir = dir_vec / dist
-                rep += rep_mag * rep_dir
-
-        return rep
-
-    def _compute_desired_heading(self, goal_error: np.ndarray, 
-                                 obstacles_nearby: bool) -> tuple:
-        """
-        Compute desired heading and speed considering goal and obstacles
-        Returns: (desired_yaw, speed_scale, vy_body)
-        """
-        # Attractive force toward goal
-        att = self.kp_xy * goal_error
-        att_mag = np.linalg.norm(att)
-        if att_mag > 0:
-            att = (att / att_mag) * min(att_mag, self.max_xy_speed)
-        else:
-            att = np.zeros(2)
-
-        # Repulsive force from obstacles
-        rep = self._get_obstacle_repulsion()
-
-        current_yaw = self.get_yaw_from_pose(self.current_pose)
-        # Reduce speed if obstacles are close
-        speed_scale = 1.0
-        min_dist = self._get_min_obstacle_distance()
-        
-        if min_dist < self.safe_stopping_dist:
-            if min_dist < 0.5:
-                speed_scale = 0.1  # Critical: nearly stop
-            elif min_dist < 1.0:
-                speed_scale = 0.3  # Warning: slow down significantly
-            else:
-                speed_scale = 0.6  # Caution: moderate slowdown
-        elif min_dist < self.rep_threshold:
-            speed_scale = 0.8  # Light slowdown
-
-        if self.use_gap_nav and obstacles_nearby and self.gap_info is not None and self.gap_info['clearance'] > 0.5 and self.gap_info['width'] > self.gap_heading_window:
-            # Use gap navigation when nearby obstacles
-            gap_angle = self.gap_info['angle']
-            desired_yaw = wrap_to_pi(current_yaw + gap_angle)
-            speed_scale = max(0.3, min(1.0, self.gap_info['clearance'] / self.rep_threshold))  # Scale speed with gap clearance
-            vy_body = 0.0
-        else:
-            # Use potential field
-            total = att + rep
-            total_mag = np.linalg.norm(total)
-            if total_mag > self.max_xy_speed:
-                total = (total / total_mag) * self.max_xy_speed
-            desired_yaw = math.atan2(total[1], total[0]) if total_mag > 0 else current_yaw
-            vy_body = 0.0
-
-            # Stuck detection
-            if total_mag < 0.1 and min_dist < self.safe_stopping_dist:
-                self.stuck_counter += 1
-                if self.stuck_counter > 5:  # Increased threshold
-                    # Find the side with the farther average distance (more open space)
-                    if self.sector_angles is not None and self.sector_mins is not None:
-                        left_mask = self.sector_angles > 0
-                        right_mask = self.sector_angles < 0
-                        left_mins = self.sector_mins[left_mask]
-                        right_mins = self.sector_mins[right_mask]
-                        left_mins = left_mins[np.isfinite(left_mins)]
-                        right_mins = right_mins[np.isfinite(right_mins)]
-                        left_avg = np.mean(left_mins) if len(left_mins) > 0 else 0
-                        right_avg = np.mean(right_mins) if len(right_mins) > 0 else 0
-                        # Choose the side with the larger average distance
-                        # if left_avg > right_avg:
-                        #     turn_angle = math.pi / 3  # Turn left 90 degrees
-                        #     # vy_body = 0.8  # Move left
-                        # else:
-                        #     turn_angle = -math.pi / 3  # Turn right 90 degrees
-                        #     # vy_body = -0.8  # Move right
-                        vy_body = np.random.choice([-1, 1]) * 1.0       # Stronger random push
-                        desired_yaw += np.random.uniform(-math.pi/6, math.pi/6) # Small random turn
-                        # desired_yaw = wrap_to_pi(current_yaw + turn_angle)
-                        speed_scale = 0.5
-            else:
-                self.stuck_counter = 0
-
-        return desired_yaw, speed_scale, vy_body
-        
     def _desired_abs_z(self) -> float:
         """
         Desired absolute altitude using (ground_z_ahead + target_height).
         Fallbacks:
         - if no forward HAG: use current ground_z (z - hag)
-        - if no HAG at all:  use absolute target_height (legacy behavior)
+        - if no HAG at all:  use absolute target_height (legacy)
         """
         tgt_hag = _desired_height(self.target_height)
 
         if self.currentZ is None:
-            return tgt_hag  # can't do better
+            return tgt_hag  # can't do better yet
 
-        # If we have a forward preview, prefer that (terrain-following look-ahead)
-        if self.hag_forward is not None and self.hag_forward == self.hag_forward:  # checks NaN
+        # Prefer forward preview (terrain look-ahead)
+        if self.hag_forward is not None and self.hag_forward == self.hag_forward:  # NaN-safe
             ground_z_ahead = self.currentZ - float(self.hag_forward)
             return ground_z_ahead + tgt_hag
 
-        # Else fall back to current ground
+        # Else current ground
         if self.hag is not None and self.hag == self.hag:
             ground_z_now = self.currentZ - float(self.hag)
             return ground_z_now + tgt_hag
 
-        # No HAG at all → legacy absolute
+        # No HAG at all → legacy absolute height
         return tgt_hag
 
-    def main_loop(self):
-        if self.status == 'Pre Flight Checks':
-            self.pre_flight_checks()
-        elif self.status == 'Landed':
-            self.landed()
-        elif self.status == 'Arrived at Goal':
-            self.arrived_at_goal()
-        elif self.status == 'Taking off':
-            self.taking_off()
-        elif self.status == 'Landing':
-            self.landing()
-        elif self.status == 'Hovering':
-            self.hovering()
-        elif self.status == 'Moving to Goal':
-            self.moving_to_goal()
-        elif self.status == 'Emergency Landing':
-            self.emergency_landing()
-        else:
-            self.set_status("Pre Flight Checks")
 
-        if self.record_active and self.status != 'Moving to Goal':
-            reached = ('Hover' in self.status) or ('Arrived' in self.status)
-            self._save_trace_csv(reached=reached)
+    def _vz_hold(self, target_z: float) -> float:
+        """PI-like altitude hold (safe clamped vz)."""
+        if self.currentZ is None:
+            return 0.0
+        now = self.get_clock().now()
+        dt  = (now - self._last_ctrl_time).nanoseconds / 1e9
+        if dt <= 0.0 or dt > 1.0:
+            dt = 1.0 / self.ctrl_hz
+        self._last_ctrl_time = now
+
+        e = float(target_z - self.currentZ)
+        self._int_z += e * dt
+        if self.ki_z > 0.0:
+            max_i = self._int_z_max / self.ki_z
+            self._int_z = clamp(self._int_z, -max_i, max_i)
+
+        vz = self.kp_z * e + self.ki_z * self._int_z
+        if vz >= 0.0:
+            vz = clamp(vz, 0.0, self.max_z_up)
+        else:
+            vz = clamp(vz, -self.max_z_down, 0.0)
+        return float(vz)
+
+    def _on_nav2_cmd(self, msg: Twist):
+        self.last_nav2_twist = msg
+
+    def _publish_with_injected_vz(self, vz: float):
+        out = Twist()
+        out.linear.x  = self.last_nav2_twist.linear.x
+        out.linear.y  = self.last_nav2_twist.linear.y
+        out.angular.z = self.last_nav2_twist.angular.z
+        out.linear.z  = float(vz)
+        self.pub_cmd_real.publish(out)
+
+    def _publish_manual(self, vx: float, vy: float, vz: float, wz: float):
+        out = Twist()
+        out.linear.x = float(vx)
+        out.linear.y = float(vy)
+        out.linear.z = float(vz)
+        out.angular.z = float(wz)
+        self.pub_cmd_real.publish(out)
+
+    def _cancel_nav2_goal(self):
+        """Robust cancel:
+        - If we have a goal handle, cancel that specific goal.
+        - Otherwise, call the CancelGoal service with an empty GoalInfo to cancel any goal.
+        """
+        # Case A: have handle → cancel via action handle
+        if self._nav2_goal_handle is not None:
+            self.get_logger().info("Cancelling Nav2 goal via goal handle…")
+            cancel_future = self._nav2_goal_handle.cancel_goal_async()
+
+            def _canceled(_):
+                self.get_logger().info("Nav2 goal cancel completed (handle).")
+                self._nav2_goal_active = False
+                self._nav2_goal_handle = None
+                self.last_nav2_twist = Twist()
+            cancel_future.add_done_callback(_canceled)
+            return
+
+        # Case B: no handle yet → cancel via CancelGoal service (cancel any goal)
+        if self.cancel_nav2_cli.service_is_ready():
+            self.get_logger().info("Cancelling Nav2 goal via CancelGoal service (no handle)…")
+            req = CancelGoal.Request()
+            # Empty GoalInfo => cancel all goals for this action server
+            req.goal_info = GoalInfo()  # default zeros (uuid all zeros, stamp 0) cancels any
+            fut = self.cancel_nav2_cli.call_async(req)
+
+            def _canceled_service(_):
+                self.get_logger().info("Nav2 CancelGoal service responded.")
+                self._nav2_goal_active = False
+                self._nav2_goal_handle = None
+                self.last_nav2_twist = Twist()
+            fut.add_done_callback(_canceled_service)
+        else:
+            self.get_logger().warn("CancelGoal service not ready; deferring cancel.")
+
+
+    # + NEW
+    def _on_nav_status(self, msg: GoalStatusArray):
+        """Track the most recent goal status from Nav2. Values:
+        0 UNKNOWN, 1 ACCEPTED, 2 EXECUTING, 3 CANCELING, 4 SUCCEEDED, 5 CANCELED, 6 ABORTED
+        """
+        if not msg.status_list:
+            return
+        last = msg.status_list[-1]
+        self._latest_nav_status = int(last.status)
+        # Treat EXECUTING as 'active', SUCCEEDED as 'reached'
+        self._have_active_goal = (self._latest_nav_status == 2)
+        if self._latest_nav_status == 4:
+            # SUCCEEDED
+            self.get_logger().info("Nav2 reports goal SUCCEEDED via status stream.")
+            # We'll let moving_to_goal() transition state, to keep logic centralized.
+
+    def _poll_readiness(self):
+        # Query Nav2 is_active without blocking the executor
+        if self.cli_nav_active.service_is_ready():
+            fut = self.cli_nav_active.call_async(Trigger.Request())
+            fut.add_done_callback(self._on_nav_ready)
+
+        # Optional localization manager: only if present; otherwise we keep _loc_ready True
+        if self.cli_loc_active.service_is_ready():
+            fut2 = self.cli_loc_active.call_async(Trigger.Request())
+            fut2.add_done_callback(self._on_loc_ready)
+
+    def _on_nav_ready(self, fut):
+        try:
+            res = fut.result()
+            self._nav_ready = bool(res.success)
+        except Exception:
+            self._nav_ready = False
+
+    def _on_loc_ready(self, fut):
+        try:
+            res = fut.result()
+            self._loc_ready = bool(res.success)
+        except Exception:
+            self._loc_ready = True  # don't block if manager is flaky/missing
+
+    def _on_nav_status(self, msg: GoalStatusArray):
+        if not msg.status_list:
+            return
+        self._latest_nav_status = int(msg.status_list[-1].status)  # 4 == SUCCEEDED
+    # -------------------- state machine --------------------
+    def main_loop(self):
+        if   self.status == 'Pre Flight Checks':  self.pre_flight_checks()
+        elif self.status == 'Taking off':         self.taking_off()
+        elif self.status == 'Moving to Goal':     self.moving_to_goal()
+        elif self.status == 'Hovering':           self.hovering()
+        elif self.status == 'Landing':            self.landing()
+        elif self.status == 'Emergency Landing':  self.emergency_landing()
+        elif self.status == 'Arrived at Goal':    self.arrived_at_goal()
+        elif self.status == 'Landed':             self.landed()
+        else:
+            self.zero_twist()
+
+        # lightweight CSV recorder (time-based)
+        self._maybe_record_row()
 
     def pre_flight_checks(self):
-        if self.currentZ is not None and self.currentZ < 0.5:
-            self.set_status("Landed")
+        # Leave pre-flight only when Nav2 (and, if present, localization) are active
+        if self._nav_ready and self._loc_ready:
+            self.set_status("Hovering")
+        else:
+            self.zero_twist()  # stay idle; async poller keeps updating flags
+
+
 
     def landed(self):
         self.zero_twist()
@@ -455,42 +389,64 @@ class FlightControl(Node):
             self.set_status('Taking off')
         elif self.last_cmd == 'move_to_goal':
             self.set_status('Taking off')
-
-    def arrived_at_goal(self):
-        gz = self._desired_abs_z()
-        vz = self._vz_hold(gz)
-        self._cmd_vel(0.0, 0.0, vz)
-        if self.last_cmd == 'land':
-            self.set_status('Landing')
+        elif self.last_cmd == 'emergency_land':
+            self.set_status('Emergency Landing')
 
     def taking_off(self):
-        tgt = self._desired_abs_z()
-        if self.currentZ is None:
-            self.zero_twist()
-            return
-        if abs(tgt - self.currentZ) <= self.pos_tol_z:
-            if self.last_cmd == 'move_to_goal' and self.goal_xyz is not None:
-                self.set_status('Moving to Goal')
+        # Terrain-following target (uses hag_forward > hag > absolute height)
+        gz = self._desired_abs_z()
+        vz = self._vz_hold(gz)
+
+        # Close enough? transition to goal or hover
+        if self.currentZ is not None and abs(gz - self.currentZ) <= self.pos_tol_z:
+            if self.last_cmd == 'move_to_goal' and self.staged_goal_xy is not None:
+                if self.nav2_client.wait_for_server(timeout_sec=0.5):
+                    self._send_nav2_goal(*self.staged_goal_xy)
+                    self.set_status('Moving to Goal')
+                else:
+                    self.get_logger().warn("NavigateToPose server not ready yet")
             else:
                 self.set_status('Hovering')
-            vz = self._vz_hold(tgt)
-            self._cmd_vel(0.0, 0.0, vz)
-            return
-        vz = self._vz_hold(tgt)
-        self._cmd_vel(0.0, 0.0, vz)
+
+        # Keep climbing/holding using injected Z
+        self._publish_with_injected_vz(vz)
+
+
+    def hovering(self):
+        # Hold terrain-following target while idle
+        gz = self._desired_abs_z()
+        vz = self._vz_hold(gz)
+        self._publish_with_injected_vz(vz)
+
+        # Command-driven transitions
+        if self.last_cmd == 'move_to_goal' and self.staged_goal_xy is not None:
+            if self.nav2_client.wait_for_server(timeout_sec=0.5):
+                self._send_nav2_goal(*self.staged_goal_xy)
+                self.set_status('Moving to Goal')
+            else:
+                self.get_logger().warn("NavigateToPose server not ready yet.")
+        elif self.last_cmd == 'land':
+            self.set_status('Landing')
+        elif self.last_cmd == 'emergency_land':
+            self.set_status('Emergency Landing')
+
 
     def moving_to_goal(self):
+        # Start/continue recording during this state
         self.record_active = True
 
-        if self.currentX is None or self.goal_xyz is None:
-            vz = self._vz_hold(self.currentZ if self.currentZ is not None else 0.0)
-            self._cmd_vel(0.0, 0.0, vz)
-            return
+        # --- Terrain-following target Z ---
+        gz = self._desired_abs_z()
+        vz = self._vz_hold(gz)
 
+        # --- Append CSV sample at fixed rate ---
         now = self.get_clock().now().nanoseconds / 1e9
-        if self.record_active and self.currentX is not None and self.currentZ is not None:
+        if (self.record_active
+            and self.currentX is not None
+            and self.currentY is not None
+            and self.currentZ is not None):
             if (now - self._last_record_t) >= (1.0 / self._record_rate_hz):
-                # ground_z = z - hag (prefer forward hag if present)
+                # ground_z = z - HAG (prefer forward HAG)
                 if self.hag_forward is not None and self.hag_forward == self.hag_forward:
                     ground_z = self.currentZ - float(self.hag_forward)
                 elif self.hag is not None and self.hag == self.hag:
@@ -500,51 +456,39 @@ class FlightControl(Node):
                 self.record_rows.append((float(self.currentX), float(self.currentY), float(ground_z)))
                 self._last_record_t = now
 
-        gx, gy, _ = self.goal_xyz  # ignore goal z
-        ex = gx - self.currentX
-        ey = gy - self.currentY
-
-        # Use set/desired height for vertical control
-        gz = self._desired_abs_z()
-        vz = self._vz_hold(gz)
-        ez = gz - (self.currentZ if self.currentZ is not None else gz)
-        ...
-        # When publishing vertical velocity, use gz from desired height
-        vz = self._vz_hold(gz)
-
-        # Check if goal reached
-        if abs(ex) <= self.pos_tol_xy and abs(ey) <= self.pos_tol_xy and abs(ez) <= self.pos_tol_z:
-            self._save_trace_csv(reached=True)
+        # --- Nav2-driven arrival: only when SUCCEEDED ---
+        if getattr(self, "_latest_nav_status", None) == 4:
+            self._cancel_nav2_goal()
             self.set_status('Arrived at Goal')
-            self.pub_goal_dist.publish(Float32(data=0.0))
-            self.pub_goal_time.publish(Float32(data=0.0))
-            vz = self._vz_hold(gz)
-            self._cmd_vel(0.0, 0.0, vz)
+            # hold altitude while state flips next tick
+            self._publish_with_injected_vz(self._vz_hold(gz))
             return
 
+        # --- Keep flying: inject Z into Nav2 XY ---
+        self._publish_with_injected_vz(vz)
+
+        # --- Command overrides while en route ---
+        if self.last_cmd == 'hover':
+            self._cancel_nav2_goal(); self.set_status('Hovering')
+        elif self.last_cmd == 'land':
+            self._cancel_nav2_goal(); self.set_status('Landing')
+        elif self.last_cmd == 'emergency_land':
+            self._cancel_nav2_goal(); self.set_status('Emergency Landing')
+
+
+
+    def arrived_at_goal(self):
+        # Hover at terrain-following target at the goal
+        gz = self._desired_abs_z()
         vz = self._vz_hold(gz)
+        self._publish_with_injected_vz(vz)
 
-        # Check for nearby obstacles
-        min_dist = self._get_min_obstacle_distance()
-        obstacles_nearby = min_dist < self.rep_threshold
+        # Commands from here
+        if self.last_cmd == 'land':
+            self.set_status('Landing')
+        elif self.last_cmd == 'hover':
+            self.set_status('Hovering')
 
-        # Compute desired heading and speed scale
-        goal_error = np.array([ex, ey])
-        desired_yaw, speed_scale, vy_body = self._compute_desired_heading(goal_error, obstacles_nearby)
-
-        # Get current yaw
-        current_yaw = self.get_yaw_from_pose(self.current_pose)
-        yaw_error = wrap_to_pi(desired_yaw - current_yaw)
-        yaw_rate_cmd = self.k_yaw * yaw_error
-
-        # Compute body frame velocity
-        v_cmd = np.linalg.norm(goal_error)
-        v_cmd = min(v_cmd * self.kp_xy, self.max_xy_speed) * speed_scale
-
-        vx_body = v_cmd if abs(yaw_error) < math.radians(10) else v_cmd * 0.7
-
-        self._cmd_vel(vx_body, vy_body, vz, yaw_rate_cmd)
-        self._update_goal_metrics()
 
     def landing(self):
         land_z = 0.10
@@ -555,49 +499,131 @@ class FlightControl(Node):
             self.zero_twist()
             self.set_status('Landed')
             return
-        vz = self._vz_hold(land_z)
-        self._cmd_vel(0.0, 0.0, vz)
-
-    def hovering(self):
-        if self.hover_z is None and self.currentZ is not None:
-            self.hover_z = float(self.currentZ)
-
-        tgt_z = self.hover_z if self.hover_z is not None else (self.currentZ or 0.0)
-        vz = self._vz_hold(tgt_z)
-        self._cmd_vel(0.0, 0.0, vz)
-
-        if self.last_cmd == 'move_to_goal' and self.goal_xyz is not None:
-            self.set_status('Moving to Goal')
-        elif self.last_cmd == 'land':
-            self.set_status('Landing')
+        self._publish_with_injected_vz(self._vz_hold(land_z))
 
     def emergency_landing(self):
+        # aggressive down target (controller clamps to max_z_down)
         if self.currentZ is None:
             self.zero_twist()
             return
-        vz = self._vz_hold(-5.0)
-        self._cmd_vel(0.0, 0.0, vz)
+        self._publish_with_injected_vz(self._vz_hold(-5.0))
         if self.currentZ <= 0.15:
             self.zero_twist()
             self.set_status('Landed')
 
-    def _update_goal_metrics(self):
-        if self.goal_xyz is None or self.currentX is None:
+    # -------------------- callbacks --------------------
+    def on_cmd(self, msg: String):
+        text = msg.data.strip().upper()
+        self.get_logger().info(f"/cmd/control: {text}")
+        self.last_cmd = GUI_TO_CMD.get(text, text.lower())
+
+        if self.last_cmd == 'takeoff':
+            self.hover_z = None
+            self.set_status('Taking off')
+
+        elif self.last_cmd == 'move_to_goal':
+            self.hover_z = None
+            if self.currentZ is not None and self.currentZ > 0.3:
+                self.set_status('Moving to Goal')
+            else:
+                self.set_status('Taking off')
+            if self.staged_goal_xy is None:
+                self.get_logger().warn("MOVE TO GOAL pressed but no staged goal set.")
+            else:
+                if self.nav2_client.wait_for_server(timeout_sec=0.5):
+                    self._send_nav2_goal(*self.staged_goal_xy)
+                else:
+                    self.get_logger().warn("NavigateToPose server not ready yet.")
+
+        elif self.last_cmd == 'hover':
+            if self.status == 'Moving to Goal' and self._nav2_goal_active:
+                self._cancel_nav2_goal()
+            self.set_status('Hovering')
+
+        elif self.last_cmd == 'land':
+            if self.status == 'Moving to Goal' and self._nav2_goal_active:
+                self._cancel_nav2_goal()
+            self.set_status('Landing')
+
+        elif self.last_cmd == 'emergency_land':
+            if self._nav2_goal_active:
+                self._cancel_nav2_goal()
+            self.set_status('Emergency Landing')
+
+        elif self.last_cmd == 'start_log':
+            self._start_logging()
+
+        elif self.last_cmd == 'stop_log':
+            self._stop_logging()
+
+    def _send_nav2_goal(self, gx: float, gy: float):
+        if not self.nav2_client.wait_for_server(timeout_sec=0.5):
+            self.get_logger().warn("Nav2 action server not available yet.")
             return
-        gx, gy, _ = self.goal_xyz
-        ex = gx - self.currentX
-        ey = gy - self.currentY
-        gz = _desired_height(self.target_height)
-        ez = (self.currentZ if self.currentZ is not None else gz) - gz
-        distance = math.sqrt(ex*ex + ey*ey + ez*ez)
-        self.pub_goal_dist.publish(Float32(data=float(distance)))
-        self.pub_goal_time.publish(Float32(data=float(distance / (self.max_xy_speed * 0.7) if self.max_xy_speed > 0 else 0.0)))
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.frame_id = 'map'
+        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg.pose.pose.position.x = float(gx)
+        goal_msg.pose.pose.position.y = float(gy)
+        goal_msg.pose.pose.position.z = 0.0
+        goal_msg.pose.pose.orientation.z = 0.0
+        goal_msg.pose.pose.orientation.w = 1.0
+
+        self.get_logger().info(f"Sending Nav2 goal → map: ({gx:.2f}, {gy:.2f})")
+        send_future = self.nav2_client.send_goal_async(goal_msg)
+
+        def _goal_response(fut):
+            goal_handle = fut.result()
+            if not goal_handle or not goal_handle.accepted:
+                self.get_logger().warn("Nav2 goal rejected.")
+                self._nav2_goal_active = False
+                self._nav2_goal_handle = None
+                return
+            self.get_logger().info("Nav2 goal accepted.")
+            self._nav2_goal_handle = goal_handle
+            self._nav2_goal_active = True
+            result_future = goal_handle.get_result_async()
+            result_future.add_done_callback(_goal_result)
+
+        def _goal_result(fut):
+            try:
+                _ = fut.result().result
+                self.get_logger().info("Nav2 goal result received.")
+            except Exception as e:
+                self.get_logger().warn(f"Nav2 goal result error: {e}")
+            self._nav2_goal_active = False
+            self._nav2_goal_handle = None
+
+        send_future.add_done_callback(_goal_response)
+
+    def on_goal(self, msg: PointStamped):
+        gx = float(msg.point.x)
+        gy = float(msg.point.y)
+        gz = self.target_height if self.target_height is not None else DEFAULT_TAKEOFF_HEIGHT
+
+        self.staged_goal_xy = (gx, gy)
+        self.goal_xyz = (gx, gy, float(gz))
+        self._publish_goal_metrics()
+        self.get_logger().info(f"/cmd/goal staged: (x={gx:.2f}, y={gy:.2f}, z={gz:.2f})")
+
+    def on_height(self, msg: Float32):
+        self.target_height = float(msg.data)
+        self.get_logger().info(f"/cmd/height: {self.target_height:.2f} m")
+        if self.status == 'Hovering':
+            self.hover_z = self.target_height  # live adjust
+
+    def on_pose(self, msg: PoseStamped):
+        self.currentX = msg.pose.position.x
+        self.currentY = msg.pose.position.y
+        self.currentZ = msg.pose.position.z
+        self._publish_goal_metrics()
 
     def on_odom(self, msg: Odometry):
-        t = msg.twist.twist
-        self.velX = float(t.linear.x)
-        self.velY = float(t.linear.y)
-        self.velZ = float(t.linear.z)
+        self.currentX = msg.pose.pose.position.x
+        self.currentY = msg.pose.pose.position.y
+        self.currentZ = msg.pose.pose.position.z
+        self._publish_goal_metrics()
 
     def on_hag(self, msg: Float32):
         self.hag = float(msg.data)
@@ -605,33 +631,91 @@ class FlightControl(Node):
     def on_hag_forward(self, msg: Float32):
         self.hag_forward = float(msg.data)
 
-    def _save_trace_csv(self, reached: bool):\
-        
+
+    def _publish_goal_metrics(self):
+        if self.currentX is None or self.goal_xyz is None:
+            return
+        gx, gy, _ = self.goal_xyz
+        dx = gx - self.currentX
+        dy = gy - self.currentY
+        dist_xy = math.hypot(dx, dy)
+        # simple placeholder ETA ~= distance
+        self.pub_goal_dist.publish(Float32(data=float(dist_xy)))
+        self.pub_goal_time.publish(Float32(data=float(max(0.0, dist_xy))))
+
+    # -------------------- CSV logging --------------------
+    def _start_logging(self):
+        if self.record_active:
+            self.get_logger().info("Logging already active.")
+            return
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        path = self._log_dir / f"log_{ts}.csv"
+        self._csv_fp = open(path, 'w', newline='')
+        self._csv_writer = csv.writer(self._csv_fp)
+        self._csv_writer.writerow(["time_s","x","y","z","vx","vy","wz","state","status"])
+        self._last_record_t = 0.0
+        self.record_active = True
+        self.get_logger().info(f"Logging → {path}")
+
+    def _stop_logging(self):
+        if not self.record_active:
+            self.get_logger().info("Logging already stopped.")
+            return
+        try:
+            self._csv_fp.flush()
+            self._csv_fp.close()
+        except Exception:
+            pass
+        self._csv_fp = None
+        self._csv_writer = None
+        self.record_active = False
+        self.get_logger().info("Logging stopped.")
+
+    def _maybe_record_row(self):
+        if not self.record_active or self._csv_writer is None:
+            return
+        now = self.get_clock().now().nanoseconds / 1e9
+        if (now - self._last_record_t) < (1.0 / self._record_rate_hz):
+            return
+        self._last_record_t = now
+
+        x = float(self.currentX) if self.currentX is not None else float('nan')
+        y = float(self.currentY) if self.currentY is not None else float('nan')
+        z = float(self.currentZ) if self.currentZ is not None else float('nan')
+        vx = float(self.last_nav2_twist.linear.x)
+        vy = float(self.last_nav2_twist.linear.y)
+        wz = float(self.last_nav2_twist.angular.z)
+        self._csv_writer.writerow([f"{now:.3f}", x, y, z, vx, vy, wz, self.status, self._last_status or ""])
+        # avoid excessive disk IO
+        try:
+            self._csv_fp.flush()
+        except Exception:
+            pass
+    
+    def _save_trace_csv(self, reached: bool):
         try:
             self.record_active = False
             if not self.record_rows:
                 self.get_logger().info("[trace] no samples recorded; skipping CSV write")
                 return
 
-            # Ensure data/ exists relative to the current working directory
             outdir = os.path.join(os.getcwd(), 'data')
             os.makedirs(outdir, exist_ok=True)
 
-            # Name file by end goal (or last pose if not reached)
+            # Name by goal (or last sample if goal unknown)
             if self.goal_xyz is not None:
                 gx, gy, _ = self.goal_xyz
             else:
-                # fallback to last recorded XY
                 gx, gy, _gz = self.record_rows[-1]
 
             fname = f"x{round(gx,2)}y{round(gy,2)}.csv"
-            # Clean filename (minus signs & dots are ok, spaces not expected)
             path = os.path.join(outdir, fname.replace(' ', ''))
 
             with open(path, 'w', newline='') as f:
                 w = csv.writer(f)
                 w.writerow(['x', 'y', 'height'])  # height = ground_z
                 for x, y, ground_z in self.record_rows:
+                    # retain your 3-decimal formatting from the sample code
                     w.writerow([f"{x:.3f}", f"{y:.3f}", f"{ground_z:.3f}"])
 
             self.get_logger().info(f"[trace] wrote {len(self.record_rows)} samples to {path}")
@@ -640,6 +724,7 @@ class FlightControl(Node):
         finally:
             self.record_rows = []
 
+# -------------------- main --------------------
 def main(args=None):
     rclpy.init(args=args)
     node = FlightControl()
@@ -649,9 +734,9 @@ def main(args=None):
         pass
     finally:
         node.zero_twist()
+        node._stop_logging()
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

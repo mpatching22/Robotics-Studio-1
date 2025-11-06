@@ -184,23 +184,23 @@ def generate_launch_description():
     )
     ld.add_action(gui_node)
 
-    # === LiDAR perception ===
-    lidar_node = Node(
-        package='trailblazer',
-        executable='lidar_perception_360.py',
-        name='lidar_perception_360',
-        namespace='rs1',
-        output='screen',
-        parameters=[
-            {
-                'scan_topic': '/scan',
-                'num_sectors': 8,
-                'front_sector_deg': 60.0,
-                'min_obs_dist': 3.0,
-            }
-        ],
-    )
-    ld.add_action(lidar_node)
+    # # === LiDAR perception ===
+    # lidar_node = Node(
+    #     package='trailblazer',
+    #     executable='lidar_perception_360.py',
+    #     name='lidar_perception_360',
+    #     namespace='rs1',
+    #     output='screen',
+    #     parameters=[
+    #         {
+    #             'scan_topic': '/scan',
+    #             'num_sectors': 8,
+    #             'front_sector_deg': 60.0,
+    #             'min_obs_dist': 3.0,
+    #         }
+    #     ],
+    # )
+    # ld.add_action(lidar_node)
 
     # === Flight control ===
     flight_control = Node(

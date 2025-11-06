@@ -26,7 +26,7 @@ class DownscanAltitude(Node):
         self.pub_angle = self.create_publisher(Float32, '/altitude/down_angle', 10)
         self.create_subscription(LaserScan, self.scan_topic, self.cb, 10)
         self.get_logger().info(f'Reading {self.scan_topic} for altitude (center={self.center_rad:.3f} rad)')
-
+        
     def _median_in_window(self, scan, center_rad, halfwin_rad):
         n = len(scan.ranges)
         if n == 0:
@@ -75,7 +75,6 @@ class DownscanAltitude(Node):
         else:
             self.pub_hag_forward.publish(Float32(data=float(hag_fwd)))
 
-        
 def main():
     rclpy.init()
     n = DownscanAltitude()
