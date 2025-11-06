@@ -1,0 +1,122 @@
+[0.010s] Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/mpatching/trailblazer -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/mpatching/trailblazer/install/trailblazer
+[0.105s] -- The C compiler identification is GNU 11.4.0
+[0.411s] -- The CXX compiler identification is GNU 11.4.0
+[0.625s] -- Detecting C compiler ABI info
+[0.720s] -- Detecting C compiler ABI info - done
+[0.724s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.724s] -- Detecting C compile features
+[0.725s] -- Detecting C compile features - done
+[0.726s] -- Detecting CXX compiler ABI info
+[0.851s] -- Detecting CXX compiler ABI info - done
+[0.855s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.856s] -- Detecting CXX compile features
+[0.856s] -- Detecting CXX compile features - done
+[0.857s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.955s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.993s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[1.018s] -- Found ros_ign_interfaces: 0.244.20 (/opt/ros/humble/share/ros_ign_interfaces/cmake)
+[1.146s] -- Found rosidl_generator_c: 3.1.7 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.152s] -- Found rosidl_adapter: 3.1.7 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.162s] -- Found rosidl_generator_cpp: 3.1.7 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.175s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.193s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.280s] -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[1.349s] -- Added test 'copyright' to check source files copyright and LICENSE
+[1.388s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[1.388s] -- Configured cppcheck include dirs: 
+[1.388s] -- Configured cppcheck exclude dirs and/or files: 
+[1.417s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[1.417s] -- Configured cpplint exclude dirs and/or files: 
+[1.422s] -- Added test 'flake8' to check Python code syntax and style conventions
+[1.429s] -- Added test 'lint_cmake' to check CMake code style
+[1.434s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[1.464s] -- Added test 'uncrustify' to check C / C++ code style
+[1.464s] -- Configured uncrustify additional arguments: 
+[1.470s] -- Added test 'xmllint' to check XML markup files
+[1.471s] -- Configuring done
+[1.474s] -- Generating done
+[1.476s] -- Build files have been written to: /home/mpatching/trailblazer/build/trailblazer
+[1.484s] Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/mpatching/trailblazer -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/mpatching/trailblazer/install/trailblazer
+[1.486s] Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
+[1.516s] Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/mpatching/trailblazer/build/trailblazer -- -j22 -l22
+[1.522s] Invoking command in '/home/mpatching/trailblazer/build/trailblazer': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer
+[1.527s] -- Install configuration: ""
+[1.527s] -- Execute custom install script
+[1.528s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/41068.rviz
+[1.533s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/gazebo_bridge.yaml
+[1.537s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/nav2_params.yaml
+[1.542s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/robot_localization.yaml
+[1.549s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/config/slam_params.yaml
+[1.554s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/mission.launch.py
+[1.559s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/launch/navigation.launch.py
+[1.564s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/materials/scripts/caster_fp.glsl
+[1.569s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/materials/scripts/caster_vp.glsl
+[1.574s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/materials/scripts/oak_tree.material
+[1.579s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/materials/textures/bark_diffuse.png
+[1.584s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/materials/textures/branch_diffuse.png
+[1.591s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/meshes/big_oak_tree.dae
+[1.596s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/model.config
+[1.601s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_oak_tree/model.sdf
+[1.606s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/materials/scripts/pine_tree.material
+[1.611s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/materials/textures/bark_diffuse.png
+[1.616s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/materials/textures/branch_2_diffuse.png
+[1.621s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/meshes/big_pine_tree.dae
+[1.626s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/model.config
+[1.632s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/big_pine_tree/model.sdf
+[1.637s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/custom_terrain/materials/textures/grass_dry.png
+[1.642s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/custom_terrain/meshes/terrain_mesh.dae
+[1.649s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/custom_terrain/model.config
+[1.655s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/custom_terrain/model.sdf
+[1.662s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/empty_grass.png
+[1.667s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/forest_overhead.png
+[1.672s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/leaf_litter.png
+[1.677s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/model.config
+[1.682s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_plane/model.sdf
+[1.689s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall.png
+[1.694s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall_transparent.png
+[1.700s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/materials/textures/forest_wall_transparent_small.png
+[1.707s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/model.config
+[1.713s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/forest_wall/model.sdf
+[1.719s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/materials/textures/empty_grass.png
+[1.725s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/model.config
+[1.731s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/models/grass_plane/model.sdf
+[1.737s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/large_demo.sdf
+[1.743s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/simple_maze.sdf
+[1.748s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/simple_trees.sdf
+[1.754s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/worlds/test_terrain.sdf
+[1.760s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/common_properties.urdf.xacro
+[1.765s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/hull.dae
+[1.770s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fl.dae
+[1.775s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_fr.dae
+[1.780s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_rl.dae
+[1.785s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/meshes/propeller_rr.dae
+[1.790s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/model.config
+[1.795s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/model.sdf
+[1.799s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/parrot.gazebo.xacro
+[1.805s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/parrot.urdf.xacro
+[1.812s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/1.png
+[1.817s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/2.png
+[1.823s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/3.png
+[1.829s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/4.png
+[1.834s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/5.png
+[1.842s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/lidar_perception_360.py
+[1.849s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/gui_node.py
+[1.855s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/flight_control.py
+[1.862s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/pose_relay.py
+[1.868s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/lib/trailblazer/altitude_lidar.py
+[1.875s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/package_run_dependencies/trailblazer
+[1.881s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/parent_prefix_path/trailblazer
+[1.886s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/ament_prefix_path.sh
+[1.894s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/ament_prefix_path.dsv
+[1.899s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/path.sh
+[1.904s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/environment/path.dsv
+[1.911s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.bash
+[1.916s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.sh
+[1.922s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.zsh
+[1.929s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/local_setup.dsv
+[1.934s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/package.dsv
+[1.940s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/ament_index/resource_index/packages/trailblazer
+[1.947s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/cmake/trailblazerConfig.cmake
+[1.953s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/cmake/trailblazerConfig-version.cmake
+[1.959s] -- Symlinking: /home/mpatching/trailblazer/install/trailblazer/share/trailblazer/package.xml
+[1.967s] Invoked command in '/home/mpatching/trailblazer/build/trailblazer' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/mpatching/trailblazer/build/trailblazer
