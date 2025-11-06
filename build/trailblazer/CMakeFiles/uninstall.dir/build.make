@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/jaydenhazell/rs1
+CMAKE_SOURCE_DIR = /home/lachlanpartridge/Robotics-Studio-1
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/jaydenhazell/rs1/build/trailblazer
+CMAKE_BINARY_DIR = /home/lachlanpartridge/Robotics-Studio-1/build/trailblazer
 
 # Utility rule file for uninstall.
 
@@ -78,6 +78,6 @@ CMakeFiles/uninstall.dir/clean:
 .PHONY : CMakeFiles/uninstall.dir/clean
 
 CMakeFiles/uninstall.dir/depend:
-	cd /home/jaydenhazell/rs1/build/trailblazer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/jaydenhazell/rs1 /home/jaydenhazell/rs1 /home/jaydenhazell/rs1/build/trailblazer /home/jaydenhazell/rs1/build/trailblazer /home/jaydenhazell/rs1/build/trailblazer/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/lachlanpartridge/Robotics-Studio-1/build/trailblazer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/lachlanpartridge/Robotics-Studio-1 /home/lachlanpartridge/Robotics-Studio-1 /home/lachlanpartridge/Robotics-Studio-1/build/trailblazer /home/lachlanpartridge/Robotics-Studio-1/build/trailblazer /home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/uninstall.dir/depend
 

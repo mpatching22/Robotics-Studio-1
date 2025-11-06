@@ -1,1 +1,1 @@
-/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash
+/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash

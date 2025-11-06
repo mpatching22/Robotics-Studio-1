@@ -29,6 +29,9 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from pathlib import Path
+from map_printer import PathMapPrinter
+from PySide6.QtWidgets import QFileDialog  # optional (if you want a chooser)
 
 
 
@@ -156,6 +159,63 @@ class TwoPaneGUI(QWidget):
         self.pose_signal.connect(self.update_current_position)
         self.hag_signal.connect(self.update_hag_box)
         self.camera_signal.connect(self.update_camera_view)
+
+    def on_print_map_clicked(self):
+        try:
+            base_dir = Path.home() / "Robotics-Studio-1"
+            data_dir = base_dir / "data"          # where flight_control saves CSVs
+            out_dir  = base_dir / "maps"
+            bg_img   = base_dir / "nodes" / "blankmap.png"            # must exist
+
+            # find latest CSV or ask user
+            csv_path = self._map_printer.latest_csv(data_dir)
+            if csv_path is None:
+                csv_path_str, _ = QFileDialog.getOpenFileName(
+                    self, "Select path CSV", str(data_dir), "CSV Files (*.csv)"
+                )
+                if not csv_path_str:
+                    return
+                csv_path = Path(csv_path_str)
+
+            # generate the maps (with background)
+            saved = self._map_printer.generate_from_csv(
+                csv_path=csv_path,
+                out_dir=out_dir,
+                base_name=csv_path.stem,
+                bg_img=bg_img,
+                style="dots",
+                levels=20,
+                alpha=0.75
+            )
+
+            # ---- open a new window showing the three maps ----
+            self.map_viewer = QWidget()
+            self.map_viewer.setWindowTitle(f"Path Maps — {csv_path.stem}")
+            self.map_viewer.resize(1100, 400)
+            layout = QHBoxLayout(self.map_viewer)
+
+            # three image labels side by side
+            for label_text, key in [("Path", "path_png"),
+                                    ("Gradient", "gradient_png"),
+                                    ("Density", "density_png")]:
+                frame = QFrame()
+                vbox = QVBoxLayout(frame)
+                lbl_title = QLabel(label_text)
+                lbl_title.setAlignment(Qt.AlignCenter)
+                lbl_title.setStyleSheet("font-weight:600; font-size:16px;")
+                vbox.addWidget(lbl_title)
+
+                lbl_img = QLabel()
+                lbl_img.setAlignment(Qt.AlignCenter)
+                pix = QPixmap(str(saved[key]))
+                lbl_img.setPixmap(pix.scaledToWidth(340, Qt.SmoothTransformation))
+                vbox.addWidget(lbl_img, 1)
+                layout.addWidget(frame, 1)
+
+            self.map_viewer.show()
+
+        except Exception as e:
+            self.map_placeholder.setText(f"Map error:\n{e}")
 
 
     def _build_ui(self):
@@ -433,12 +493,42 @@ class TwoPaneGUI(QWidget):
         # ----- CONTROL column -----
         right = QVBoxLayout()
         right.setSpacing(0)
+        
+        # --- CONTROL title + PRINT MAP button on one row ---
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(12)
 
+        # Match STATUS title size and height
         control_title = QLabel("<u>CONTROL</u>")
         control_title.setObjectName("paneTitle")
-        control_title.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        right.addWidget(control_title)
-        right.addSpacing(18)  # small gap under title
+        control_title.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        control_title.setStyleSheet("""
+            font-size: 16px;           /* same as STATUS title */
+            font-weight: 700;
+            margin-left: 24px;         /* small nudge to line up */
+            min-height: 1px;          /* ensures same vertical height as STATUS */
+        """)
+
+        # Keep the same full-sized green button, perfectly aligned right
+        self.btn_print_map = QPushButton("PRINT MAP")
+        self.btn_print_map.setObjectName("btnMove")
+        self.btn_print_map.setMinimumHeight(48)
+        self.btn_print_map.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.btn_print_map.clicked.connect(self.on_print_map_clicked)
+
+        title_row.addWidget(control_title, 1, Qt.AlignLeft)
+        title_row.addStretch(1)
+        title_row.addWidget(self.btn_print_map, 0, Qt.AlignRight)
+
+        right.addLayout(title_row)
+        right.addSpacing(18)  # small gap below header
+
+        # Printer instance ready
+        self._map_printer = PathMapPrinter(fixed_extent_m=48.5)
+
+
+
 
         # Container that holds the rows of buttons.
         grid = QWidget()

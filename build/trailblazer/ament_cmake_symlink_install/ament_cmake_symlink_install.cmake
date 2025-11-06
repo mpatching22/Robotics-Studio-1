@@ -23,7 +23,7 @@ function(ament_cmake_symlink_install_directory cmake_current_source_dir)
 
   # make destination absolute path and ensure that it exists
   if(NOT IS_ABSOLUTE "${ARG_DESTINATION}")
-    set(ARG_DESTINATION "/home/jaydenhazell/rs1/install/trailblazer/${ARG_DESTINATION}")
+    set(ARG_DESTINATION "/home/lachlanpartridge/Robotics-Studio-1/install/trailblazer/${ARG_DESTINATION}")
   endif()
   if(NOT EXISTS "${ARG_DESTINATION}")
     file(MAKE_DIRECTORY "${ARG_DESTINATION}")
@@ -123,7 +123,7 @@ function(ament_cmake_symlink_install_files cmake_current_source_dir)
 
   # make destination an absolute path and ensure that it exists
   if(NOT IS_ABSOLUTE "${ARG_DESTINATION}")
-    set(ARG_DESTINATION "/home/jaydenhazell/rs1/install/trailblazer/${ARG_DESTINATION}")
+    set(ARG_DESTINATION "/home/lachlanpartridge/Robotics-Studio-1/install/trailblazer/${ARG_DESTINATION}")
   endif()
   if(NOT EXISTS "${ARG_DESTINATION}")
     file(MAKE_DIRECTORY "${ARG_DESTINATION}")
@@ -181,7 +181,7 @@ function(ament_cmake_symlink_install_programs cmake_current_source_dir)
 
   # make destination an absolute path and ensure that it exists
   if(NOT IS_ABSOLUTE "${ARG_DESTINATION}")
-    set(ARG_DESTINATION "/home/jaydenhazell/rs1/install/trailblazer/${ARG_DESTINATION}")
+    set(ARG_DESTINATION "/home/lachlanpartridge/Robotics-Studio-1/install/trailblazer/${ARG_DESTINATION}")
   endif()
   if(NOT EXISTS "${ARG_DESTINATION}")
     file(MAKE_DIRECTORY "${ARG_DESTINATION}")
@@ -251,7 +251,7 @@ function(ament_cmake_symlink_install_targets)
 
     # make destination an absolute path and ensure that it exists
     if(NOT IS_ABSOLUTE "${destination}")
-      set(destination "/home/jaydenhazell/rs1/install/trailblazer/${destination}")
+      set(destination "/home/lachlanpartridge/Robotics-Studio-1/install/trailblazer/${destination}")
     endif()
     if(NOT EXISTS "${destination}")
       file(MAKE_DIRECTORY "${destination}")
@@ -311,49 +311,49 @@ message(STATUS "Execute custom install script")
 # begin of custom install code
 
 # install(DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_directory("/home/jaydenhazell/rs1" DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_directory("/home/lachlanpartridge/Robotics-Studio-1" DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
 
 # install(PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
-ament_cmake_symlink_install_programs("/home/jaydenhazell/rs1" PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
+ament_cmake_symlink_install_programs("/home/lachlanpartridge/Robotics-Studio-1" PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/trailblazer" "DESTINATION" "share/ament_index/resource_index/parent_prefix_path")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/trailblazer" "DESTINATION" "share/ament_index/resource_index/parent_prefix_path")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/trailblazer" "DESTINATION" "share/ament_index/resource_index/parent_prefix_path")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/trailblazer" "DESTINATION" "share/ament_index/resource_index/parent_prefix_path")
 
 # install(FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/ament_prefix_path.sh" "DESTINATION" "share/trailblazer/environment")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/ament_prefix_path.sh" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/ament_prefix_path.sh" "DESTINATION" "share/trailblazer/environment")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/ament_prefix_path.dsv" "DESTINATION" "share/trailblazer/environment")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/ament_prefix_path.dsv" "DESTINATION" "share/trailblazer/environment")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/ament_prefix_path.dsv" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/ament_prefix_path.dsv" "DESTINATION" "share/trailblazer/environment")
 
 # install(FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/path.sh" "DESTINATION" "share/trailblazer/environment")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/path.sh" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/opt/ros/humble/share/ament_cmake_core/cmake/environment_hooks/environment/path.sh" "DESTINATION" "share/trailblazer/environment")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/path.dsv" "DESTINATION" "share/trailblazer/environment")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/path.dsv" "DESTINATION" "share/trailblazer/environment")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/path.dsv" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/path.dsv" "DESTINATION" "share/trailblazer/environment")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.bash" "DESTINATION" "share/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.sh" "DESTINATION" "share/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.zsh" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.zsh" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.zsh" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.zsh" "DESTINATION" "share/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.dsv" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/local_setup.dsv" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.dsv" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/local_setup.dsv" "DESTINATION" "share/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/package.dsv" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/package.dsv" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/package.dsv" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_environment_hooks/package.dsv" "DESTINATION" "share/trailblazer")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/packages/trailblazer" "DESTINATION" "share/ament_index/resource_index/packages")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/packages/trailblazer" "DESTINATION" "share/ament_index/resource_index/packages")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/packages/trailblazer" "DESTINATION" "share/ament_index/resource_index/packages")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/packages/trailblazer" "DESTINATION" "share/ament_index/resource_index/packages")
 
-# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_core/trailblazerConfig.cmake" "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_core/trailblazerConfig-version.cmake" "DESTINATION" "share/trailblazer/cmake")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_core/trailblazerConfig.cmake" "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_core/trailblazerConfig-version.cmake" "DESTINATION" "share/trailblazer/cmake")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_core/trailblazerConfig.cmake" "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_core/trailblazerConfig-version.cmake" "DESTINATION" "share/trailblazer/cmake")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_core/trailblazerConfig.cmake" "/home/lachlanpartridge/Robotics-Studio-1/build/trailblazer/ament_cmake_core/trailblazerConfig-version.cmake" "DESTINATION" "share/trailblazer/cmake")
 
-# install(FILES "/home/jaydenhazell/rs1/package.xml" "DESTINATION" "share/trailblazer")
-ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/package.xml" "DESTINATION" "share/trailblazer")
+# install(FILES "/home/lachlanpartridge/Robotics-Studio-1/package.xml" "DESTINATION" "share/trailblazer")
+ament_cmake_symlink_install_files("/home/lachlanpartridge/Robotics-Studio-1" FILES "/home/lachlanpartridge/Robotics-Studio-1/package.xml" "DESTINATION" "share/trailblazer")
