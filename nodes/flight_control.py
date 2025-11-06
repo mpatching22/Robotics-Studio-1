@@ -43,6 +43,8 @@ STATUSES = [
     "Emergency Landing",
 ]
 
+DEFAULT_HEIGHT_M = 1.0
+
 class FlightControl(Node):
     def __init__(self):
         super().__init__('flight_control')
@@ -107,7 +109,7 @@ class FlightControl(Node):
         self._last_status = None
         self.last_cmd = None
 
-        self.target_height = None
+        self.target_height = DEFAULT_HEIGHT_M
         self.goal_xyz = None
         self.hover_z = None
 
@@ -134,6 +136,9 @@ class FlightControl(Node):
         self.timer = self.create_timer(1.0 / max(1.0, self.ctrl_hz), self.main_loop)
         self.set_status(self.status)
         self.get_logger().info(f'Control Rate: {self.ctrl_hz} Hz, Gap Navigation: {self.use_gap_nav}')
+
+    def _desired_height(target_height: float | None) -> float:
+        return target_height if target_height is not None else DEFAULT_HEIGHT_M
 
     def get_yaw_from_pose(self, pose):
         q = pose.orientation
@@ -200,13 +205,14 @@ class FlightControl(Node):
             self.hover_z = None
             self.set_status('Emergency Landing')
 
-    def on_goal(self, msg: PointStamped):
-        self.goal_xyz = (float(msg.point.x), float(msg.point.y), float(msg.point.z))
-        self._update_goal_metrics()
-        self.get_logger().info(f"/cmd/goal: {self.goal_xyz}")
+        def on_goal(self, msg: PointStamped):
+            self.goal_xyz = (float(msg.point.x), float(msg.point.y), 0.0)
+            self._update_goal_metrics()
+            self.get_logger().info(f"/cmd/goal: (x={self.goal_xyz[0]:.2f}, y={self.goal_xyz[1]:.2f})  [z ignored]")
 
     def on_height(self, msg: Float32):
         self.target_height = float(msg.data)
+        self.get_logger().info(f"Set height updated to {self.target_height:.2f} m")
 
     def on_pose(self, msg: PoseStamped):
         self.current_pose = msg.pose
@@ -403,14 +409,14 @@ class FlightControl(Node):
             self.set_status('Taking off')
 
     def arrived_at_goal(self):
-        gz = self.goal_xyz[2] if self.goal_xyz is not None else (self.currentZ or 0.0)
+        gz = _desired_height(self.target_height)
         vz = self._vz_hold(gz)
         self._cmd_vel(0.0, 0.0, vz)
         if self.last_cmd == 'land':
             self.set_status('Landing')
 
     def taking_off(self):
-        tgt = self.target_height if self.target_height is not None else 2.0
+        tgt = _desired_height(self.target_height)
         if self.currentZ is None:
             self.zero_twist()
             return
@@ -431,10 +437,16 @@ class FlightControl(Node):
             self._cmd_vel(0.0, 0.0, vz)
             return
 
-        gx, gy, gz = self.goal_xyz
+        gx, gy, _ = self.goal_xyz  # ignore goal z
         ex = gx - self.currentX
         ey = gy - self.currentY
+
+        # Use set/desired height for vertical control
+        gz = _desired_height(self.target_height)
         ez = gz - (self.currentZ if self.currentZ is not None else gz)
+        ...
+        # When publishing vertical velocity, use gz from desired height
+        vz = self._vz_hold(gz)
 
         # Check if goal reached
         if abs(ex) <= self.pos_tol_xy and abs(ey) <= self.pos_tol_xy and abs(ez) <= self.pos_tol_z:
@@ -507,12 +519,11 @@ class FlightControl(Node):
     def _update_goal_metrics(self):
         if self.goal_xyz is None or self.currentX is None:
             return
-
-        gx, gy, gz = self.goal_xyz
+        gx, gy, _ = self.goal_xyz
         ex = gx - self.currentX
         ey = gy - self.currentY
-        ez = gz - self.currentZ
-
+        gz = _desired_height(self.target_height)
+        ez = (self.currentZ if self.currentZ is not None else gz) - gz
         distance = math.sqrt(ex*ex + ey*ey + ez*ez)
         self.pub_goal_dist.publish(Float32(data=float(distance)))
         self.pub_goal_time.publish(Float32(data=float(distance / (self.max_xy_speed * 0.7) if self.max_xy_speed > 0 else 0.0)))
