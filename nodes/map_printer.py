@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from pathlib import Path
+
+# NEW: force a headless backend BEFORE importing pyplot
+import matplotlib as _mpl
+_mpl.use("Agg")
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
@@ -107,8 +112,6 @@ class PathMapPrinter:
             "gradient_png": str(p2),
             "density_png": str(p3)
         }
-
-
 
     # ================= helpers =================
     def _load_csv(self, path: Path) -> PathFeatures:
