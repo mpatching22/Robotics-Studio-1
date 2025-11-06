@@ -131,7 +131,7 @@ class MapWidget(QLabel):
         if bg_path and Path(bg_path).exists():
             pix = QPixmap(bg_path)
             # Rotate 90° counter-clockwise
-            transform = QTransform().rotate(-90)
+            transform = QTransform()
             self._bg = pix.transformed(transform, Qt.SmoothTransformation)
         else:
             self._bg = QPixmap()
@@ -187,21 +187,28 @@ class MapWidget(QLabel):
             v = int((E - yv) / (2.0 * E) * h)
             p.drawLine(0, v, 7, v)
 
-        # --- labels for -25, 0, +25 ---
+        # --- only draw "0" labels, moved slightly inward ---
         p.setFont(QFont("", 10))
         p.setPen(QColor(0, 0, 0))
 
-        # X-axis labels at bottom
-        for xv in (-E, 0, E):
-            u = int((xv + E) / (2.0 * E) * w)
-            text = f"{int(xv)}"
-            p.drawText(u - 12, h - 12, 25, 14, Qt.AlignHCenter | Qt.AlignVCenter, text)
+        # pixel where x = 0, y = 0
+        u0 = int((0.0 + E) / (2.0 * E) * w)   # center horizontally
+        v0 = int((E - 0.0) / (2.0 * E) * h)   # center vertically
 
-        # Y-axis labels on left
-        for yv in (-E, 0, E):
+        # --- ±10 labels on X and Y axes ---
+        # X-axis ±10 (two ticks = 10 m apart)
+        for xv in (20, 0):
+            u = int((xv + E) / (2.0 * E) * w)
+            p.drawText(u - 8, h - 25, 16, 16,
+                       Qt.AlignHCenter | Qt.AlignVCenter, f"{xv}")
+
+        # Y-axis ±10 (two ticks = 10 m apart)
+        for yv in (20, 0):
             v = int((E - yv) / (2.0 * E) * h)
-            text = f"{int(yv)}"
-            p.drawText(8, v - 7, 25, 14, Qt.AlignLeft | Qt.AlignVCenter, text)
+            p.drawText(10, v - 8, 16, 16,
+                       Qt.AlignLeft | Qt.AlignVCenter, f"{yv}")
+
+
 
         # --- small blue drone dot ---
         if self._has_pose:
