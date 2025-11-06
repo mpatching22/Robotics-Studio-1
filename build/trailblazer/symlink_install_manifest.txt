@@ -8,6 +8,14 @@
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/launch/navigation.launch.py
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/boulder/boulder.sdf
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/boulder/model.config
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/materials/textures/grass_dry.png
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/materials/textures/grass_dry.png:Zone.Identifier
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/meshes/terrain_mesh.dae
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/meshes/terrain_mesh.dae:Zone.Identifier
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/model.config
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/model.config:Zone.Identifier
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/model.sdf
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/custom_terrain/model.sdf:Zone.Identifier
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/empty_grass.png
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/forest_overhead.png
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/models/forest_plane/materials/textures/leaf_litter.png

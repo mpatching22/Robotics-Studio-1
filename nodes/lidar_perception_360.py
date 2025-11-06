@@ -14,7 +14,6 @@ from std_msgs.msg import Float32MultiArray
 def wrap_to_pi(a):
     return (a + math.pi) % (2*math.pi) - math.pi
 
-
 class LidarPerception360(Node):
     """
     Enhanced 360° 2D LiDAR perception with:
@@ -278,6 +277,7 @@ class LidarPerception360(Node):
             f"Sectors: {nsec}, "
             "Sect(m): " + ", ".join(f"{v:.1f}" for v in sector_mins[:8])  # Show first 8
         )
+        
         self.pub_status.publish(String(data=status))
         self.get_logger().info(status)
 

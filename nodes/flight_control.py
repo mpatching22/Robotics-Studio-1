@@ -45,6 +45,10 @@ STATUSES = [
 
 DEFAULT_HEIGHT_M = 1.0
 
+def _desired_height(target_height: float | None) -> float:
+    return target_height if target_height is not None else DEFAULT_HEIGHT_M
+    
+    
 class FlightControl(Node):
     def __init__(self):
         super().__init__('flight_control')
@@ -137,9 +141,6 @@ class FlightControl(Node):
         self.set_status(self.status)
         self.get_logger().info(f'Control Rate: {self.ctrl_hz} Hz, Gap Navigation: {self.use_gap_nav}')
 
-    def _desired_height(target_height: float | None) -> float:
-        return target_height if target_height is not None else DEFAULT_HEIGHT_M
-
     def get_yaw_from_pose(self, pose):
         q = pose.orientation
         return _quat_to_yaw(q.x, q.y, q.z, q.w)
@@ -205,10 +206,10 @@ class FlightControl(Node):
             self.hover_z = None
             self.set_status('Emergency Landing')
 
-        def on_goal(self, msg: PointStamped):
-            self.goal_xyz = (float(msg.point.x), float(msg.point.y), 0.0)
-            self._update_goal_metrics()
-            self.get_logger().info(f"/cmd/goal: (x={self.goal_xyz[0]:.2f}, y={self.goal_xyz[1]:.2f})  [z ignored]")
+    def on_goal(self, msg: PointStamped):
+        self.goal_xyz = (float(msg.point.x), float(msg.point.y), 0.0)
+        self._update_goal_metrics()
+        self.get_logger().info(f"/cmd/goal: (x={self.goal_xyz[0]:.2f}, y={self.goal_xyz[1]:.2f})  [z ignored]")
 
     def on_height(self, msg: Float32):
         self.target_height = float(msg.data)
