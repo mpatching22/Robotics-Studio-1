@@ -129,7 +129,6 @@ def generate_launch_description():
                               'navigation.launch.py']),
         launch_arguments={
             'use_sim_time': use_sim_time,
-            'log_level': 'error'    # <-- add this line
         }.items(),
         condition=IfCondition(LaunchConfiguration('nav2'))
     )

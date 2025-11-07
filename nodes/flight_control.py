@@ -28,6 +28,14 @@ import os, csv, time
 
 DEFAULT_HEIGHT_M = 0.75  # or keep your preferred default
 
+try:
+    # Nav2 Humble+ standard
+    from nav2_msgs.srv import ClearEntireCostmap
+    _CLEAR_SRV = ClearEntireCostmap
+except Exception:
+    # Fallback seen in some setups
+    from std_srvs.srv import Empty as _CLEAR_SRV
+
 def _desired_height(target_height: float | None) -> float:
     return target_height if target_height is not None else DEFAULT_HEIGHT_M
 
@@ -44,7 +52,7 @@ GUI_TO_CMD = {
 }
 
 # -------------------- Defaults / Params --------------------
-DEFAULT_TAKEOFF_HEIGHT = 0.75     # per your spec
+DEFAULT_TAKEOFF_HEIGHT = 1     # per your spec
 DEFAULT_OUTPUT_CMD_TOPIC = '/cmd_vel_real'
 NAV2_CMD_TOPIC = '/cmd_vel'
 STATUS_TOPIC = '/movement/status'
@@ -131,14 +139,25 @@ class FlightControl(Node):
         self._record_rate_hz = 5.0    # sample rate while Moving to Goal
 
         # ---- parameters
-        self.declare_parameter('control_rate_hz', 20.0)
-        self.declare_parameter('max_z_up',       2.0)
+        self.declare_parameter('control_rate_hz', 35.0)
+        self.declare_parameter('max_z_up',       3.0)
         self.declare_parameter('max_z_down',     1.0)
         self.declare_parameter('kp_z',           0.65)
         self.declare_parameter('ki_z',           0.20)
         self.declare_parameter('pos_tol_xy',     0.25)
         self.declare_parameter('pos_tol_z',      0.15)
-
+        # --- Δz watchdog params ---
+        self.declare_parameter("z_clear_thresh_m", 0.4)          # trigger if Δz over window > 0.7 m
+        self.declare_parameter("z_clear_window_sec", 0.75)       # time window to measure Δz
+        self.declare_parameter("z_clear_cooldown_sec", 2.0)      # avoid spam-clearing
+        self.declare_parameter("z_clear_global_enable", False)   # usually False; local clear is enough
+        self.declare_parameter("z_clear_global_mult", 2.0)       # only used if global enabled (bigger Δz)
+        # --- Δz watchdog params (read) ---
+        self.z_clear_thresh_m       = float(self.get_parameter("z_clear_thresh_m").value)
+        self.z_clear_window_sec     = float(self.get_parameter("z_clear_window_sec").value)
+        self.z_clear_cooldown_sec   = float(self.get_parameter("z_clear_cooldown_sec").value)
+        self.z_clear_global_enable  = bool(self.get_parameter("z_clear_global_enable").value)
+        self.z_clear_global_mult    = float(self.get_parameter("z_clear_global_mult").value)
         self.ctrl_hz    = float(self.get_parameter('control_rate_hz').value)
         self.max_z_up   = float(self.get_parameter('max_z_up').value)
         self.max_z_down = float(self.get_parameter('max_z_down').value)
@@ -161,6 +180,19 @@ class FlightControl(Node):
         self.currentZ = None
 
         self.hover_z = None
+
+        # --- Δz watchdog state ---
+        from collections import deque
+        self._z_hist = deque()     # list of (t_sec, z)
+        self._last_clear_t = 0.0
+
+        # --- costmap clear service clients (Nav2 default names) ---
+        self._clear_local_cli  = self.create_client(_CLEAR_SRV, '/local_costmap/clear_entirely_local_costmap')
+        self._clear_global_cli = self.create_client(_CLEAR_SRV, '/global_costmap/clear_entirely_global_costmap')
+
+        # (Optional) Don’t block waiting; we’ll check readiness before calling.
+        # Running Nav2 to a goal?
+        self._is_navigating = False
 
         # PID memory for Z hold
         self._int_z = 0.0
@@ -186,6 +218,10 @@ class FlightControl(Node):
 
         self.set_status(self.status)
         self.get_logger().info("FlightControl ready (Nav2 XY + custom Z → /vel_cmd_real).")
+
+        now_s = self.get_clock().now().nanoseconds * 1e-9
+        if self._is_navigating:
+            self._dz_watchdog_and_clear(now_s)
 
     # -------------------- utilities --------------------
     def _republish_status(self):
@@ -234,7 +270,7 @@ class FlightControl(Node):
         # No HAG at all → legacy absolute height
         return tgt_hag
 
-
+    
     def _vz_hold(self, target_z: float) -> float:
         """PI-like altitude hold (safe clamped vz)."""
         if self.currentZ is None:
@@ -358,6 +394,54 @@ class FlightControl(Node):
         if not msg.status_list:
             return
         self._latest_nav_status = int(msg.status_list[-1].status)  # 4 == SUCCEEDED
+
+    def _dz_watchdog_and_clear(self, now_s: float) -> None:
+        """
+        Tracks altitude changes over a short window. If |Δz| exceeds threshold,
+        clear the local costmap (and optionally global) to prevent 'ghost' obstacles
+        after fast climbs/descents.
+        """
+        z = self.currentZ
+        if z is None:
+            return
+
+        # 1) Keep a short history window
+        self._z_hist.append((now_s, float(z)))
+        while self._z_hist and (now_s - self._z_hist[0][0]) > self.z_clear_window_sec:
+            self._z_hist.popleft()
+
+        if len(self._z_hist) < 2:
+            return
+
+        z_old = self._z_hist[0][1]
+        dz = abs(float(z) - z_old)
+        since_last = now_s - self._last_clear_t
+
+        # 2) Decide whether to clear local (and maybe global)
+        want_local = (dz > self.z_clear_thresh_m) and (since_last > self.z_clear_cooldown_sec)
+        want_global = self.z_clear_global_enable and (dz > (self.z_clear_thresh_m * self.z_clear_global_mult)) \
+                    and (since_last > self.z_clear_cooldown_sec)
+
+        if not (want_local or want_global):
+            return
+
+        # 3) Fire the clears (non-blocking)
+        if want_local and self._clear_local_cli.service_is_ready():
+            try:
+                self.get_logger().info(f"Δz watchdog: Δz={dz:.2f}m → clearing LOCAL costmap")
+                self._clear_local_cli.call_async(_CLEAR_SRV.Request())
+                self._last_clear_t = now_s
+            except Exception as e:
+                self.get_logger().warn(f"Δz watchdog: local clear failed: {e}")
+
+        if want_global and self._clear_global_cli.service_is_ready():
+            try:
+                self.get_logger().info(f"Δz watchdog: large Δz={dz:.2f}m → clearing GLOBAL costmap")
+                self._clear_global_cli.call_async(_CLEAR_SRV.Request())
+                self._last_clear_t = now_s
+            except Exception as e:
+                self.get_logger().warn(f"Δz watchdog: global clear failed: {e}")
+
     # -------------------- state machine --------------------
     def main_loop(self):
         if   self.status == 'Pre Flight Checks':  self.pre_flight_checks()
@@ -377,11 +461,9 @@ class FlightControl(Node):
     def pre_flight_checks(self):
         # Leave pre-flight only when Nav2 (and, if present, localization) are active
         if self._nav_ready and self._loc_ready:
-            self.set_status("Hovering")
+            self.set_status("Landed")
         else:
             self.zero_twist()  # stay idle; async poller keeps updating flags
-
-
 
     def landed(self):
         self.zero_twist()
@@ -458,6 +540,7 @@ class FlightControl(Node):
 
         # --- Nav2-driven arrival: only when SUCCEEDED ---
         if getattr(self, "_latest_nav_status", None) == 4:
+            self._is_navigating = False
             self._cancel_nav2_goal()
             self.set_status('Arrived at Goal')
             # hold altitude while state flips next tick
@@ -469,12 +552,14 @@ class FlightControl(Node):
 
         # --- Command overrides while en route ---
         if self.last_cmd == 'hover':
+            self._is_navigating = False
             self._cancel_nav2_goal(); self.set_status('Hovering')
         elif self.last_cmd == 'land':
+            self._is_navigating = False
             self._cancel_nav2_goal(); self.set_status('Landing')
         elif self.last_cmd == 'emergency_land':
+            self._is_navigating = False
             self._cancel_nav2_goal(); self.set_status('Emergency Landing')
-
 
 
     def arrived_at_goal(self):
@@ -557,6 +642,7 @@ class FlightControl(Node):
             self._stop_logging()
 
     def _send_nav2_goal(self, gx: float, gy: float):
+        self._is_navigating = True
         if not self.nav2_client.wait_for_server(timeout_sec=0.5):
             self.get_logger().warn("Nav2 action server not available yet.")
             return

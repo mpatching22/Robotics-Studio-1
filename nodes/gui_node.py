@@ -151,15 +151,15 @@ class MapWidget(QLabel):
     def paintEvent(self, ev):
         # no super() here to avoid double painters
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing, True)
-
+        
         w, h = self.width(), self.height()
-
         # --- background (already rotated once in __init__) ---
         if not self._bg.isNull():
             p.drawPixmap(0, 0, w, h, self._bg)
         else:
             p.fillRect(0, 0, w, h, QColor(240, 240, 240))
+
+        p.setRenderHint(QPainter.Antialiasing, True)
 
         # --- frame ---
         frame_pen = QPen(QColor(40, 40, 40))
@@ -196,17 +196,19 @@ class MapWidget(QLabel):
         v0 = int((E - 0.0) / (2.0 * E) * h)   # center vertically
 
         # --- ±10 labels on X and Y axes ---
-        # X-axis ±10 (two ticks = 10 m apart)
+        # --- X-axis labels, invert sign for display only (to match Y behavior) ---
         for xv in (20, 0):
-            u = int((xv + E) / (2.0 * E) * w)
+            u = int((xv + E) / (2.0 * E) * w)  # same grid position
+            display_val = -xv                   # invert the printed value
             p.drawText(u - 8, h - 25, 16, 16,
-                       Qt.AlignHCenter | Qt.AlignVCenter, f"{xv}")
+                    Qt.AlignHCenter | Qt.AlignVCenter, f"{display_val}")
 
-        # Y-axis ±10 (two ticks = 10 m apart)
+        # Y-axis labels, but invert sign for display only
         for yv in (20, 0):
             v = int((E - yv) / (2.0 * E) * h)
+            display_val = -yv  # invert label, keep same grid position
             p.drawText(10, v - 8, 16, 16,
-                       Qt.AlignLeft | Qt.AlignVCenter, f"{yv}")
+                    Qt.AlignLeft | Qt.AlignVCenter, f"{display_val}")
 
 
 
@@ -220,9 +222,6 @@ class MapWidget(QLabel):
             p.drawEllipse(u - 3, v - 3, 6, 6)
 
         p.end()
-
-
-
 
 class TwoPaneGUI(QWidget):
     status_signal = Signal(str)
