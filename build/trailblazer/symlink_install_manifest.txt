@@ -64,7 +64,14 @@
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/4.png
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/5.png
 /home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/urdf_drone/thumbnails/hull.dae
-/home/jaydenhazell/rs1/install/trailblazer/lib/trailblazer/lidar_perception_360.py
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/environment/pythonpath.sh
+/home/jaydenhazell/rs1/install/trailblazer/share/trailblazer/environment/pythonpath.dsv
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info/PKG-INFO
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info/SOURCES.txt
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info/dependency_links.txt
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info/top_level.txt
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils/__init__.py
+/home/jaydenhazell/rs1/install/trailblazer/local/lib/python3.10/dist-packages/trailblazer_utils/map_printer.py
 /home/jaydenhazell/rs1/install/trailblazer/lib/trailblazer/pose_relay.py
 /home/jaydenhazell/rs1/install/trailblazer/lib/trailblazer/altitude_lidar.py
 /home/jaydenhazell/rs1/install/trailblazer/lib/trailblazer/flight_control.py

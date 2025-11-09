@@ -1,1 +1,1 @@
-ros_ign_interfaces;ros_ign_gazebo;ros_ign_bridge;robot_localization;rclpy;PySide6;geometry_msgs;ament_lint_auto;ament_lint_common
+ros_ign_interfaces;ros_ign_gazebo;ros_ign_bridge;robot_localization;rclpy;geometry_msgs;sensor_msgs;nav_msgs;nav2_msgs;tf2_ros;robot_state_publisher;nav2_bringup;slam_toolbox;PySide6;python3-matplotlib;ament_cmake_python;ament_lint_auto;ament_lint_common

@@ -313,8 +313,20 @@ message(STATUS "Execute custom install script")
 # install(DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
 ament_cmake_symlink_install_directory("/home/jaydenhazell/rs1" DIRECTORY "config" "launch" "models" "worlds" "urdf_drone" "DESTINATION" "share/trailblazer")
 
-# install(PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
-ament_cmake_symlink_install_programs("/home/jaydenhazell/rs1" PROGRAMS "nodes/lidar_perception_360.py" "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
+# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/pythonpath.sh" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/pythonpath.sh" "DESTINATION" "share/trailblazer/environment")
+
+# install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/trailblazer/environment")
+ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/trailblazer/environment")
+
+# install(DIRECTORY "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_python/trailblazer_utils/trailblazer_utils.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info")
+ament_cmake_symlink_install_directory("/home/jaydenhazell/rs1" DIRECTORY "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_python/trailblazer_utils/trailblazer_utils.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/trailblazer_utils-1.0.3-py3.10.egg-info")
+
+# install(DIRECTORY "/home/jaydenhazell/rs1/trailblazer_utils/" "DESTINATION" "local/lib/python3.10/dist-packages/trailblazer_utils" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+ament_cmake_symlink_install_directory("/home/jaydenhazell/rs1" DIRECTORY "/home/jaydenhazell/rs1/trailblazer_utils/" "DESTINATION" "local/lib/python3.10/dist-packages/trailblazer_utils" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+
+# install(PROGRAMS "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
+ament_cmake_symlink_install_programs("/home/jaydenhazell/rs1" PROGRAMS "nodes/pose_relay.py" "nodes/altitude_lidar.py" "nodes/flight_control.py" "nodes/gui_node.py" "DESTINATION" "lib/trailblazer")
 
 # install(FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/home/jaydenhazell/rs1" FILES "/home/jaydenhazell/rs1/build/trailblazer/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/trailblazer" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")

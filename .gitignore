@@ -1,4 +1,27 @@
-extra_code/
+# ============================
+# Trailblazer Project Git Ignore
+# ============================
+
+# --- ROS2 build / install / log directories ---
 build/
 install/
 log/
+
+
+# --- Python cache ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Generated CSVs, maps, and logs ---
+data/*
+maps/*
+!data/.gitkeep
+!maps/.gitkeep
+
+# --- Local runtime logs ---
+*.log
+*.csv
+*.txt
+~/.ros/trailblazer_logs/

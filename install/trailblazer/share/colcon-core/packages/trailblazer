@@ -1,1 +1,1 @@
-PySide6:geometry_msgs:rclpy:robot_localization:ros_ign_bridge:ros_ign_gazebo:ros_ign_interfaces
+PySide6:ament_cmake_python:geometry_msgs:nav2_bringup:nav2_msgs:nav_msgs:python3-matplotlib:rclpy:robot_localization:robot_state_publisher:ros_ign_bridge:ros_ign_gazebo:ros_ign_interfaces:sensor_msgs:slam_toolbox:tf2_ros

@@ -1,32 +1,63 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<!--
+  Package manifest for the Trailblazer project.
+
+  Notes
+  - Keep runtime (exec_depend) focussed on what your nodes/launches actually use.
+  - ament_cmake_python is declared so we can install/import the trailblazer_utils package.
+  - Gazebo/Ignition resource exports remain for models/worlds.
+-->
 <package format="3">
   <name>trailblazer</name>
   <version>1.0.3</version>
-  <description>TurtleBot 4 Ignition Simulator bringup</description>
-  <maintainer email="rkreinin@clearpathrobotics.com">rkreinin</maintainer>
-  <license>Apache 2.0</license>
+  <description>Trailblazer simulation, navigation, flight control and GUI bringup.</description>
 
+  <!-- Ownership -->
+  <maintainer email="jayden.d.hazell@student.uts.edu.au">rkreinin</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- Build tools -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- ROS IGN -->
+  <!-- Build-time deps (for installing Python packages, etc.) -->
+  <build_depend>ament_cmake_python</build_depend>
+
+  <!-- Core ROS deps (runtime) -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <!-- Navigation / SLAM stacks started from launch -->
+  <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+
+  <!-- GUI + plotting -->
+  <exec_depend>PySide6</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
+
+  <!-- Gazebo / Ignition bridge stack (if used in worlds and launch) -->
   <depend>ros_ign_interfaces</depend>
   <depend>ros_ign_gazebo</depend>
   <depend>ros_ign_bridge</depend>
 
-  <!-- Other -->
+  <!-- Localisation, if used -->
   <depend>robot_localization</depend>
 
-  <!-- GUI -->
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>PySide6</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
+  <!-- ament helpers -->
+  <exec_depend>ament_cmake_python</exec_depend>
 
+  <!-- Linting (optional) -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
+    <!-- Make packaged models/worlds discoverable by Gazebo/Ignition -->
     <gazebo_ros gazebo_model_path="${prefix}/models"/>
     <gazebo_ros gazebo_media_path="${prefix}/worlds"/>
   </export>

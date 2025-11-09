@@ -1,159 +1,279 @@
 #!/usr/bin/env python3
-import sys, signal
-from pathlib import Path
+# -*- coding: utf-8 -*-
+"""
+@file gui_node.py
+@brief Trailblazer operator GUI (PySide6) with ROS 2 integration.
 
+@details
+Two-pane control and status panel used to:
+- Send goals, height setpoints, and control verbs to the flight controller.
+- Display current status, pose, HAG (height-above-ground), distance/time to goal.
+- Preview a camera stream (optional, via cv_bridge) and render a simple map with the
+  current XY position.
+- Generate map/graph images from CSV logs using `trailblazer_utils.map_printer`.
+
+@par Publications
+- `/cmd/control` (`std_msgs/String`)                : Free-form command text (e.g., "MOVE TO GOAL", "HOVER").
+- `/cmd/goal`    (`geometry_msgs/PointStamped`)     : Goal in `map` frame (Z=0, Nav2 handles XY).
+- `/cmd/height`  (`std_msgs/Float32`)               : Target HAG in metres.
+
+@par Subscriptions
+- `/movement/status` (`std_msgs/String`)            : Human-readable state from flight_control.
+- `/drone/pose_1hz`  (`geometry_msgs/PoseStamped`)  : Down-sampled pose for UI.
+- `/altitude/hag`    (`std_msgs/Float32`)           : Current HAG.
+- `/goal/distance`   (`std_msgs/Float32`)           : Remaining distance to goal (m).
+- `/goal/time`       (`std_msgs/Float32`)           : Time metric (ETA/elapsed) in seconds.
+- `/camera/image`    (`sensor_msgs/Image`, optional): RGB/BGR camera preview (requires cv_bridge).
+
+@par Notes
+- cv_bridge is imported lazily to avoid NumPy/ABI issues; if unavailable, the GUI disables camera preview.
+- The ROS event loop is integrated with Qt using `QTimer` + `rclpy.spin_once`.
+"""
+
+from __future__ import annotations
+
+import sys
+import signal
+from pathlib import Path
+from typing import Optional
+
+# ------------------------------
+# Qt
+# ------------------------------
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QLabel, QHBoxLayout, QVBoxLayout,
-    QFrame, QPushButton, QSizePolicy, QListWidget, QListWidgetItem,
+    QApplication, QWidget, QDialog, QLabel, QHBoxLayout, QVBoxLayout,
+    QFrame, QPushButton, QSizePolicy, QListWidget,
     QFileDialog, QMessageBox, QLineEdit
 )
 
+# ------------------------------
+# ROS 2
+# ------------------------------
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
-
 from std_msgs.msg import String, Float32
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, PointStamped
 
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QFont, QTransform
 
-
-
-# Important: DO NOT import cv_bridge / matplotlib here
-CvBridge = None
-cv2 = None
-
-# Defer cv_bridge import to runtime (NumPy 2.x compatibility issues)
-CvBridge = None
-cv2 = None
-
+# =============================================================================
+# ROS node backend
+# =============================================================================
 class GuiNode(Node):
-    def __init__(self):
+    """
+    @class GuiNode
+    @brief ROS 2 backend for the GUI (publishers, subscribers, and bridge to Qt).
+
+    @details
+    Exposes convenience publishing methods (`send`, `publish_goal`, `publish_height`)
+    and forwards subscribed messages to the GUI via Qt signals stored on a back-reference
+    (`self.gui_ref`), which is set by the Qt widget after construction.
+    """
+
+    def __init__(self) -> None:
+        """
+        @brief Construct publishers/subscribers and attempt to enable the camera.
+        """
         super().__init__('gui_node')
 
-        # Publishers
+        # ---- Publishers ----
         self.pub_cmd = self.create_publisher(String, '/cmd/control', 10)
         self.pub_goal = self.create_publisher(PointStamped, '/cmd/goal', 10)
         self.pub_height = self.create_publisher(Float32, '/cmd/height', 10)
 
-        # Subscribers (status + pose + goal info + lidar height)
-        self.sub_status = self.create_subscription(String, '/movement/status', self.status_callback, 10)
-        self.sub_pose_ps = self.create_subscription(PoseStamped, '/drone/pose_1hz', self.pose_callback_ps, 10)
-        self.sub_hag = self.create_subscription(Float32, '/altitude/hag', self.hag_cb, 10)
-        self.sub_goal_dist = self.create_subscription(Float32, '/goal/distance', self.goal_dist_cb, 10)
-        self.sub_goal_time = self.create_subscription(Float32, '/goal/time', self.goal_time_cb, 10)
+        # ---- Subscribers ----
+        self.create_subscription(String, '/movement/status', self.status_callback, 10)
+        self.create_subscription(PoseStamped, '/drone/pose_1hz', self.pose_callback_ps, 10)
+        self.create_subscription(Float32, '/altitude/hag', self.hag_cb, 10)
+        self.create_subscription(Float32, '/goal/distance', self.goal_dist_cb, 10)
+        self.create_subscription(Float32, '/goal/time', self.goal_time_cb, 10)
 
-        # Camera (lazy cv_bridge import so NumPy/Matplotlib mismatches don't crash startup)
+        # Optional camera: lazy import to avoid cv_bridge/NumPy issues
         self.sub_cam = None
         self.bridge = None
         try:
-            from cv_bridge import CvBridge as _CvBridge
-            import cv2 as _cv2
+            from cv_bridge import CvBridge as _CvBridge  # type: ignore
+            import cv2 as _cv2  # noqa: F401  (kept for potential future operations)
             self.bridge = _CvBridge()
-            self._cv2 = _cv2
             self.sub_cam = self.create_subscription(Image, '/camera/image', self.camera_cb, 10)
+            self.get_logger().info('cv_bridge detected: camera preview enabled')
         except Exception as e:
             self.get_logger().warn(f'cv_bridge not available; camera disabled: {e}')
 
-        # Back-refs set by the GUI widget
-        self.gui_ref = None
+        # Back-reference set by TwoPaneGUI
+        self.gui_ref: Optional[TwoPaneGUI] = None
 
-    # -------- ROS Callbacks --------
-    def status_callback(self, msg: String):
+    # -------------------------------------------------------------------------
+    # Subscriber callbacks → emit Qt signals via gui_ref
+    # -------------------------------------------------------------------------
+    def status_callback(self, msg: String) -> None:
+        """
+        @brief Forward status text to GUI.
+        @param msg Incoming status string.
+        """
         if self.gui_ref:
             self.gui_ref.status_signal.emit(msg.data)
 
-    def goal_dist_cb(self, msg: Float32):
+    def goal_dist_cb(self, msg: Float32) -> None:
+        """
+        @brief Forward distance-to-goal to GUI.
+        @param msg Remaining distance (metres).
+        """
         if self.gui_ref:
             self.gui_ref.goal_dist_signal.emit(float(msg.data))
 
-    def goal_time_cb(self, msg: Float32):
+    def goal_time_cb(self, msg: Float32) -> None:
+        """
+        @brief Forward time metric (ETA/elapsed) to GUI.
+        @param msg Time in seconds.
+        """
         if self.gui_ref:
             self.gui_ref.goal_eta_signal.emit(float(msg.data))
 
-    def hag_cb(self, msg: Float32):
+    def hag_cb(self, msg: Float32) -> None:
+        """
+        @brief Forward current HAG to GUI.
+        @param msg Height-above-ground (metres).
+        """
         if self.gui_ref:
             self.gui_ref.hag_signal.emit(float(msg.data))
 
-    def pose_callback_ps(self, msg: PoseStamped):
+    def pose_callback_ps(self, msg: PoseStamped) -> None:
+        """
+        @brief Forward pose (PoseStamped) to GUI as (x, y, z).
+        @param msg geometry_msgs/PoseStamped
+        """
         if self.gui_ref:
             p = msg.pose.position
             self.gui_ref.pose_signal.emit(float(p.x), float(p.y), float(p.z))
 
-    def pose_callback_pcs(self, msg: PoseWithCovarianceStamped):
+    def pose_callback_pcs(self, msg: PoseWithCovarianceStamped) -> None:
+        """
+        @brief Alternate pose callback (PoseWithCovarianceStamped).
+        @param msg geometry_msgs/PoseWithCovarianceStamped
+        @note Not wired by default, but retained for compatibility.
+        """
         if self.gui_ref:
             p = msg.pose.pose.position
             self.gui_ref.pose_signal.emit(float(p.x), float(p.y), float(p.z))
 
-    def camera_cb(self, msg: Image):
+    def camera_cb(self, msg: Image) -> None:
+        """
+        @brief Convert ROS Image → QImage (via cv_bridge) and emit to GUI.
+        @param msg sensor_msgs/Image
+        @note Exits early if cv_bridge is unavailable.
+        """
         try:
-            if not self.bridge:
+            if not self.bridge or not self.gui_ref:
                 return
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            if self.gui_ref:
-                self.gui_ref.camera_signal.emit(frame)
+            self.gui_ref.camera_signal.emit(frame)
         except Exception as e:
             self.get_logger().warn(f'Camera conversion failed: {e}')
 
-    # -------- Convenience publishers called by GUI --------
-    def send(self, msg_text: str):
+    # -------------------------------------------------------------------------
+    # Convenience publishers (called by the GUI)
+    # -------------------------------------------------------------------------
+    def send(self, msg_text: str) -> None:
+        """
+        @brief Publish a free-form control command on `/cmd/control`.
+        @param msg_text Command text (e.g. "MOVE TO GOAL", "HOVER").
+        """
+        msg_text = (msg_text or '').strip()
+        if not msg_text:
+            return
         self.pub_cmd.publish(String(data=msg_text))
         self.get_logger().info(f"Published: {msg_text}")
 
-    def publish_goal(self, x: float, y: float):
+    def publish_goal(self, x: float, y: float) -> None:
+        """
+        @brief Publish a goal on `/cmd/goal` (map frame, Z=0).
+        @param x Goal X (m)
+        @param y Goal Y (m)
+        """
         msg = PointStamped()
         msg.header.frame_id = 'map'
-        msg.point.x, msg.point.y, msg.point.z = x, y, 0.0
+        msg.point.x, msg.point.y, msg.point.z = float(x), float(y), 0.0
         self.pub_goal.publish(msg)
         self.get_logger().info(f"Published /cmd/goal: ({x}, {y})")
 
-    def publish_height(self, h: float):
+    def publish_height(self, h: float) -> None:
+        """
+        @brief Publish a height setpoint on `/cmd/height`.
+        @param h Target HAG in metres.
+        """
         self.pub_height.publish(Float32(data=float(h)))
         self.get_logger().info(f"Published /cmd/height: {h}")
 
+
+# =============================================================================
+# Map widget (simple background + axes + drone dot)
+# =============================================================================
 class MapWidget(QLabel):
-    def __init__(self, bg_path: str, extent_half: float = 25.0, parent=None):
+    """
+    @class MapWidget
+    @brief Lightweight map view that draws a background image, axes, and the drone dot.
+
+    @details
+    Coordinates are mapped from a world square [-E, +E] to the widget rectangle,
+    where +Y is up in world space and rendered as decreasing pixel V (topwards).
+    """
+
+    def __init__(self, bg_path: str, extent_half: float = 25.0, parent=None) -> None:
+        """
+        @brief Construct the widget and load the background image.
+        @param bg_path Path to a background PNG (not rotated in code).
+        @param extent_half Half-extent E (metres) for the world square.
+        @param parent Qt parent widget.
+        """
         super().__init__(parent)
         self.setMinimumSize(200, 200)
         self.setAlignment(Qt.AlignCenter)
+
         self._extent = float(extent_half)
         self._has_pose = False
         self._x = 0.0
         self._y = 0.0
 
-        # --- load and rotate background ONCE here ---
-        from PySide6.QtGui import QTransform
-        from pathlib import Path
-
         if bg_path and Path(bg_path).exists():
-            pix = QPixmap(bg_path)
-            # Rotate 90° counter-clockwise
-            transform = QTransform()
-            self._bg = pix.transformed(transform, Qt.SmoothTransformation)
+            self._bg = QPixmap(bg_path)
         else:
             self._bg = QPixmap()
 
-    def set_pose(self, x: float, y: float):
+    def set_pose(self, x: float, y: float) -> None:
+        """
+        @brief Update the current position and trigger a repaint.
+        @param x World X (m)
+        @param y World Y (m)
+        """
         self._x, self._y = float(x), float(y)
         self._has_pose = True
         self.update()
 
-    def _world_to_px(self, x: float, y: float, w: int, h: int):
-        # map x∈[-E,E] -> u∈[0,w]; y∈[-E,E] (with +y up) -> v∈[h,0]
+    def _world_to_px(self, x: float, y: float, w: int, h: int) -> tuple[int, int]:
+        """
+        @brief Convert world coordinates to widget pixel coordinates.
+        @param x World X
+        @param y World Y
+        @param w Widget width
+        @param h Widget height
+        @return (u, v) pixel coordinates
+        """
         E = self._extent
         u = (x + E) / (2.0 * E) * w
         v = (E - y) / (2.0 * E) * h
         return int(u), int(v)
 
-    def paintEvent(self, ev):
-        # no super() here to avoid double painters
+    def paintEvent(self, ev) -> None:
+        """
+        @brief Custom paint: background, frame, axes, ticks, labels, and drone dot.
+        """
         p = QPainter(self)
-        
         w, h = self.width(), self.height()
-        # --- background (already rotated once in __init__) ---
+
+        # Background
         if not self._bg.isNull():
             p.drawPixmap(0, 0, w, h, self._bg)
         else:
@@ -161,25 +281,21 @@ class MapWidget(QLabel):
 
         p.setRenderHint(QPainter.Antialiasing, True)
 
-        # --- frame ---
-        frame_pen = QPen(QColor(40, 40, 40))
-        frame_pen.setWidth(2)
+        # Frame
+        frame_pen = QPen(QColor(40, 40, 40)); frame_pen.setWidth(2)
         p.setPen(frame_pen)
         p.drawRect(0, 0, w - 1, h - 1)
 
-        # --- side axes (left = Y, bottom = X) ---
-        axis_pen = QPen(QColor(0, 0, 0))
-        axis_pen.setWidth(3)
+        # Axes
+        axis_pen = QPen(QColor(0, 0, 0)); axis_pen.setWidth(3)
         p.setPen(axis_pen)
-        p.drawLine(0, 0, 0, h - 1)         # Y axis (left)
-        p.drawLine(0, h - 1, w - 1, h - 1) # X axis (bottom)
+        p.drawLine(0, 0, 0, h - 1)          # Y axis (left)
+        p.drawLine(0, h - 1, w - 1, h - 1)  # X axis (bottom)
 
-        # --- ticks every 5 m ---
-        tick_pen = QPen(QColor(0, 0, 0))
-        tick_pen.setWidth(2)
+        # Ticks every 5 m
+        tick_pen = QPen(QColor(0, 0, 0)); tick_pen.setWidth(2)
         p.setPen(tick_pen)
-        E = self._extent  # usually 25
-
+        E = self._extent
         for xv in range(int(-E), int(E) + 1, 5):
             u = int((xv + E) / (2.0 * E) * w)
             p.drawLine(u, h - 1, u, h - 8)
@@ -187,55 +303,59 @@ class MapWidget(QLabel):
             v = int((E - yv) / (2.0 * E) * h)
             p.drawLine(0, v, 7, v)
 
-        # --- only draw "0" labels, moved slightly inward ---
+        # A couple of labels (0 and ±20) tucked inward to avoid overlap with background
         p.setFont(QFont("", 10))
         p.setPen(QColor(0, 0, 0))
-
-        # pixel where x = 0, y = 0
-        u0 = int((0.0 + E) / (2.0 * E) * w)   # center horizontally
-        v0 = int((E - 0.0) / (2.0 * E) * h)   # center vertically
-
-        # --- ±10 labels on X and Y axes ---
-        # --- X-axis labels, invert sign for display only (to match Y behavior) ---
         for xv in (20, 0):
-            u = int((xv + E) / (2.0 * E) * w)  # same grid position
-            display_val = -xv                   # invert the printed value
-            p.drawText(u - 8, h - 25, 16, 16,
-                    Qt.AlignHCenter | Qt.AlignVCenter, f"{display_val}")
-
-        # Y-axis labels, but invert sign for display only
+            u = int((xv + E) / (2.0 * E) * w)
+            display_val = -xv  # invert label sign as per your prior UI convention
+            p.drawText(u - 8, h - 25, 16, 16, Qt.AlignHCenter | Qt.AlignVCenter, f"{display_val}")
         for yv in (20, 0):
             v = int((E - yv) / (2.0 * E) * h)
-            display_val = -yv  # invert label, keep same grid position
-            p.drawText(10, v - 8, 16, 16,
-                    Qt.AlignLeft | Qt.AlignVCenter, f"{display_val}")
+            display_val = -yv
+            p.drawText(10, v - 8, 16, 16, Qt.AlignLeft | Qt.AlignVCenter, f"{display_val}")
 
-
-
-        # --- small blue drone dot ---
+        # Drone dot
         if self._has_pose:
             u, v = self._world_to_px(self._x, self._y, w, h)
-            dot_pen = QPen(QColor(20, 100, 255))
-            dot_pen.setWidth(4)
-            p.setPen(dot_pen)
-            p.setBrush(QColor(20, 100, 255))
+            dot_pen = QPen(QColor(20, 100, 255)); dot_pen.setWidth(4)
+            p.setPen(dot_pen); p.setBrush(QColor(20, 100, 255))
             p.drawEllipse(u - 3, v - 3, 6, 6)
 
         p.end()
 
+
+# =============================================================================
+# GUI (Qt) front-end
+# =============================================================================
 class TwoPaneGUI(QWidget):
+    """
+    @class TwoPaneGUI
+    @brief Operator GUI with STATUS (left) and CONTROL (right) panes.
+
+    @details
+    - STATUS: status text, last command, current pose, HAG, distance/time to goal, camera preview.
+    - CONTROL: goal entry, height setpoint, and a grid of action buttons.
+    - Map/graph section: shows a small map with the drone dot and a CSV picker
+      to generate maps/graphs via `trailblazer_utils.map_printer`.
+    """
+
+    # Qt signals receiving data from the ROS backend
     status_signal = Signal(str)
     goal_dist_signal = Signal(float)
     goal_eta_signal = Signal(float)
     pose_signal = Signal(float, float, float)
     hag_signal = Signal(float)
-    camera_signal = Signal(object)  # cv2/numpy frame
+    camera_signal = Signal(object)  # numpy image (BGR)
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """
+        @brief Construct the GUI and connect internal signals.
+        """
         super().__init__()
         self._build_ui()
 
-        # Connect signals
+        # Connect signals to UI update slots
         self.status_signal.connect(self.update_status_box)
         self.goal_dist_signal.connect(self.update_goal_distance)
         self.goal_eta_signal.connect(self.update_goal_eta)
@@ -243,9 +363,17 @@ class TwoPaneGUI(QWidget):
         self.hag_signal.connect(self.update_hag_box)
         self.camera_signal.connect(self.update_camera_view)
 
-    def _resolve_data_dir(self):
-        # Prefer CWD/data; otherwise repo-root/data (nodes/.. = repo root)
-        from pathlib import Path
+        # Set by main() after instantiating GuiNode
+        self.ros_node: GuiNode
+
+    # -------------------------------------------------------------------------
+    # Helpers: file system / list
+    # -------------------------------------------------------------------------
+    def _resolve_data_dir(self) -> Path:
+        """
+        @brief Find the `data/` directory (cwd/data first, else repo_root/data).
+        @return Path to data directory.
+        """
         cwd = Path.cwd()
         data_dir = cwd / "data"
         if data_dir.exists():
@@ -253,8 +381,10 @@ class TwoPaneGUI(QWidget):
         repo_root = Path(__file__).resolve().parents[1]
         return repo_root / "data"
 
-    def _refresh_csv_list(self):
-        from pathlib import Path
+    def _refresh_csv_list(self) -> None:
+        """
+        @brief Populate the CSV list from the resolved data directory.
+        """
         self.data_dir = self._resolve_data_dir()
         self.file_list.clear()
         if not self.data_dir.exists():
@@ -270,38 +400,46 @@ class TwoPaneGUI(QWidget):
             return
         self.file_list.setEnabled(True)
         for p in files:
-            self.file_list.addItem(p.stem)  # strip .csv
+            self.file_list.addItem(p.stem)  # show name without .csv
         self.btn_show_graphs.setEnabled(False)
 
-    def _on_file_selected(self, curr, prev):
-        # Enable only if a real file is selected
+    def _on_file_selected(self, curr, prev) -> None:
+        """
+        @brief Enable graph generation button when a real file is selected.
+        """
         if curr is None or curr.text() == "No files found":
             self.btn_show_graphs.setEnabled(False)
         else:
             self.btn_show_graphs.setEnabled(True)
 
-    def on_show_graphs_clicked(self):
+    # -------------------------------------------------------------------------
+    # Map/graph generation
+    # -------------------------------------------------------------------------
+    def on_show_graphs_clicked(self) -> None:
+        """
+        @brief Generate path/gradient/density maps from the selected CSV and preview them.
+        @details
+        Uses `trailblazer_utils.map_printer.PathMapPrinter` with:
+        - fixed_extent_m = 48.5
+        - background: repo_root/files/blankmap.png
+        Saves into repo_root/maps and previews any returned PNGs.
+        """
         import traceback
         try:
-            from pathlib import Path
-
-            # Resolve selected CSV
-            data_dir = self._resolve_data_dir()
             sel = self.file_list.currentItem()
             if sel is None or sel.text() == 'No files found':
                 return
-            csv_path = data_dir / f"{sel.text()}.csv"
+
+            csv_path = self._resolve_data_dir() / f"{sel.text()}.csv"
             if not csv_path.exists():
                 raise FileNotFoundError(f"CSV not found: {csv_path}")
 
-            # Resolve output dir and background image (note: files/ is at repo root)
             repo_root = Path(__file__).resolve().parents[1]
             out_dir = repo_root / "maps"
             out_dir.mkdir(parents=True, exist_ok=True)
             bg_img = repo_root / "files" / "blankmap.png"
 
-            # Import and call the map printer (GUI does not import matplotlib)
-            from map_printer import PathMapPrinter
+            from trailblazer_utils.map_printer import PathMapPrinter
             printer = PathMapPrinter(fixed_extent_m=48.5)
             result = printer.generate_from_csv(
                 csv_path=csv_path,
@@ -310,110 +448,51 @@ class TwoPaneGUI(QWidget):
                 bg_img=bg_img
             )
 
-            # If map_printer returns the saved file paths, preview them in a Qt window
-            # (This does not use matplotlib; it just loads the PNGs.)
-            try:
-                paths = []
-                # handle both dict-style return and tuple/list fallbacks
-                if isinstance(result, dict):
-                    for k in ("path_png", "gradient_png", "density_png"):
-                        if k in result:
-                            paths.append((k.replace("_png", "").title(), Path(result[k])))
-                elif isinstance(result, (list, tuple)):
-                    # assume (path_png, gradient_png, density_png)
-                    labels = ("Path", "Gradient", "Density")
-                    for label, p in zip(labels, result):
-                        paths.append((label, Path(p)))
-                else:
-                    paths = []
-
-                if paths:
-                    self._show_saved_images(f"Graphs — {csv_path.stem}", paths)
-                else:
-                    from PySide6.QtWidgets import QMessageBox
-                    QMessageBox.information(self, "Maps generated",
-                                            f"Maps saved to:\n{out_dir}\n\n"
-                                            f"(map_printer did not return file paths to preview)")
-
-            except Exception:
-                from PySide6.QtWidgets import QMessageBox
-                QMessageBox.information(self, "Maps generated",
-                                        f"Maps saved to:\n{out_dir}\n\n"
-                                        f"(preview skipped)")
-
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
             tb = traceback.format_exc()
-            QMessageBox.critical(self, "SHOW GRAPHS failed", f"{e}\n\n{tb}")
+            QMessageBox.critical(self, "GENERATE GRAPHS failed", f"{e}\n\n{tb}")
 
-
-
-
-    def _build_ui(self):
+    # -------------------------------------------------------------------------
+    # UI construction
+    # -------------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        """
+        @brief Build the complete UI, wire buttons, and populate the CSV list.
+        """
         self.setWindowTitle("Trailblazer GUI")
         self.resize(QSize(1120, 300))
-        self.status_signal.connect(self.update_status_box)
 
         # ---------- Styles ----------
         self.setStyleSheet("""
             QWidget { font-size: 14px; }
             #paneTitle { font-weight: 700; font-size: 16px; }
-
             #divider { background: rgba(0,0,0,.45); min-width:2px; max-width:2px; }
-
-            /* STATUS boxes */
             #statusLabel { font-weight: 600; margin-left: 6px; }
-            #lastCmdBox, #statusBoxGeneric {
+            #lastCmdBox, #statusBoxGeneric, #goalBox, #miniBox, #videoBox, #mapBox {
                 border: 2px solid #333333;
                 border-radius: 4px;
-                background: #ffffff;        /* change lastCmdBox bg later when wiring logic */
+                background: #ffffff;
             }
-                           
             QPushButton {
                 font-size: 26px; font-weight: 700;
-                padding: 14px 18px;
-                border: none;
-                border-radius: 18px;
+                padding: 14px 18px; border: none; border-radius: 18px;
             }
-            QPushButton:pressed {
-                background-color: #888888;
-                padding-left: 16px;
-                padding-top: 16px;
-            }
-
+            QPushButton:pressed { background-color: #888888; padding-left: 16px; padding-top: 16px; }
             #btnHover    { background: #D9C40A; }
-            #btnMove    { background: #64B32D; }
-            #btnLand    { background: #F06A1A; }
-            #btnTakeoff { background: #0C8F24; }
-            #btnEStop   { background: #CF1C12; }
-                           
-            #goalBox, #miniBox, #videoBox {
-                border: 2px solid #333333;
-                border-radius: 4px;
-                background: #ffffff;
-            }
-                           
-            #goalBox {
-                border: 2px solid #333333;
-                border-radius: 4px;
-                background: #ffffff;
-            }
-            #mapBox {
-                border: 2px solid #333333;
-                border-radius: 4px;
-                background: #ffffff;
-            }
+            #btnMove     { background: #64B32D; }
+            #btnLand     { background: #F06A1A; }
+            #btnTakeoff  { background: #0C8F24; }
+            #btnEStop    { background: #CF1C12; }
         """)
 
         # ===== Root: STATUS | divider | CONTROL =====
         root = QHBoxLayout(self)
-        root.setSpacing(0)                        # flush to the divider
-        root.setContentsMargins(18, 14, 18, 18)   # outer padding
+        root.setSpacing(0)
+        root.setContentsMargins(18, 14, 18, 18)
         self.setLayout(root)
 
         # ----- STATUS column -----
-        left = QVBoxLayout()
-        left.setSpacing(0.5)
+        left = QVBoxLayout(); left.setSpacing(0.5)
 
         status_title = QLabel("<u>STATUS</u>")
         status_title.setObjectName("paneTitle")
@@ -421,21 +500,15 @@ class TwoPaneGUI(QWidget):
         left.addWidget(status_title)
 
         # --- Status box ---
-        status_container = QWidget()
-        st_v = QVBoxLayout(status_container)
-        st_v.setContentsMargins(8, 6, 8, 6)
-        st_v.setSpacing(1)
-
-        st_lbl = QLabel("Status")
-        st_lbl.setObjectName("statusLabel")
+        status_container = QWidget(); st_v = QVBoxLayout(status_container)
+        st_v.setContentsMargins(8, 6, 8, 6); st_v.setSpacing(1)
+        st_lbl = QLabel("Status"); st_lbl.setObjectName("statusLabel")
         st_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.status_box = QFrame()
-        self.status_box.setObjectName("statusBoxGeneric")
+        self.status_box = QFrame(); self.status_box.setObjectName("statusBoxGeneric")
         self.status_box.setFixedSize(260, 60)
 
-        self.status_text = QLabel("CONNECTING...")
-        self.status_text.setAlignment(Qt.AlignCenter)
+        self.status_text = QLabel("CONNECTING..."); self.status_text.setAlignment(Qt.AlignCenter)
         _st_box_layout = QVBoxLayout(self.status_box)
         _st_box_layout.setContentsMargins(4, 4, 4, 4)
         _st_box_layout.addWidget(self.status_text, 0, Qt.AlignCenter)
@@ -443,391 +516,237 @@ class TwoPaneGUI(QWidget):
         st_v.addWidget(st_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         st_v.addWidget(self.status_box, 0, Qt.AlignHCenter)
         left.addWidget(status_container, 0, Qt.AlignHCenter)
-        
-        # --- Last Command box (label top-left, box centered) ---
-        last_cmd_container = QWidget()
-        lc_v = QVBoxLayout(last_cmd_container)
-        lc_v.setContentsMargins(8, 6, 8, 6)
-        lc_v.setSpacing(1)
 
-        lc_lbl = QLabel("Last Command")
-        lc_lbl.setObjectName("statusLabel")
+        # --- Last Command ---
+        last_cmd_container = QWidget(); lc_v = QVBoxLayout(last_cmd_container)
+        lc_v.setContentsMargins(8, 6, 8, 6); lc_v.setSpacing(1)
+        lc_lbl = QLabel("Last Command"); lc_lbl.setObjectName("statusLabel")
         lc_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.last_cmd_box = QFrame()
-        self.last_cmd_box.setObjectName("lastCmdBox")
+        self.last_cmd_box = QFrame(); self.last_cmd_box.setObjectName("lastCmdBox")
         self.last_cmd_box.setFixedSize(260, 60)
-
-        # Text inside the box
-        self.last_cmd_text = QLabel("NO COMMAND")
-        self.last_cmd_text.setAlignment(Qt.AlignCenter)
-        # put the text inside the frame with a tiny layout
+        self.last_cmd_text = QLabel("NO COMMAND"); self.last_cmd_text.setAlignment(Qt.AlignCenter)
         _lc_box_layout = QVBoxLayout(self.last_cmd_box)
         _lc_box_layout.setContentsMargins(4, 4, 4, 4)
         _lc_box_layout.addWidget(self.last_cmd_text, 0, Qt.AlignCenter)
-
         lc_v.addWidget(lc_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         lc_v.addWidget(self.last_cmd_box, 0, Qt.AlignHCenter)
         left.addWidget(last_cmd_container, 0, Qt.AlignHCenter)
 
-        # --- Current Position (X/Y/Z from /pose) ---
-        pos_container = QWidget()
-        pos_v = QVBoxLayout(pos_container)
-        pos_v.setContentsMargins(8, 6, 8, 6)
-        pos_v.setSpacing(1)
-
-        pos_lbl = QLabel("Current Position")
-        pos_lbl.setObjectName("statusLabel")
+        # --- Current Position ---
+        pos_container = QWidget(); pos_v = QVBoxLayout(pos_container)
+        pos_v.setContentsMargins(8, 6, 8, 6); pos_v.setSpacing(1)
+        pos_lbl = QLabel("Current Position"); pos_lbl.setObjectName("statusLabel")
         pos_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.pos_box = QFrame()
-        self.pos_box.setObjectName("goalBox")   # uses same style as other boxes
-        self.pos_box.setFixedSize(260, 68)
+        self.pos_box = QFrame(); self.pos_box.setObjectName("goalBox"); self.pos_box.setFixedSize(260, 68)
+        row = QHBoxLayout(self.pos_box); row.setContentsMargins(10, 8, 10, 8); row.setSpacing(14)
 
-        row = QHBoxLayout(self.pos_box)
-        row.setContentsMargins(10, 8, 10, 8)
-        row.setSpacing(14)
-
-        def pair(bold_text: str):
-            name = QLabel(f"<b>{bold_text}</b>")
-            val  = QLabel("—")
+        def _pair(bold_text: str) -> tuple[QWidget, QLabel]:
+            name = QLabel(f"<b>{bold_text}</b>"); val = QLabel("—")
             inner = QHBoxLayout(); inner.setContentsMargins(0,0,0,0); inner.setSpacing(6)
-            inner.addWidget(name, 0, Qt.AlignLeft)
-            inner.addWidget(val, 0, Qt.AlignLeft)
+            inner.addWidget(name, 0, Qt.AlignLeft); inner.addWidget(val, 0, Qt.AlignLeft)
             wrap = QWidget(); w = QHBoxLayout(wrap); w.setContentsMargins(0,0,0,0); w.addLayout(inner)
             return wrap, val
 
-        x_wrap, self.pos_x_value = pair("X:")
-        y_wrap, self.pos_y_value = pair("Y:")
-        z_wrap, self.pos_z_value = pair("Z:")
-
-        row.addWidget(x_wrap)
-        row.addWidget(y_wrap)
-        row.addWidget(z_wrap)
+        x_wrap, self.pos_x_value = _pair("X:")
+        y_wrap, self.pos_y_value = _pair("Y:")
+        z_wrap, self.pos_z_value = _pair("Z:")
+        row.addWidget(x_wrap); row.addWidget(y_wrap); row.addWidget(z_wrap)
 
         pos_v.addWidget(pos_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         pos_v.addWidget(self.pos_box, 0, Qt.AlignHCenter)
         left.addWidget(pos_container, 0, Qt.AlignHCenter)
 
-        # --- Height Based off LIDAR ---
-        hag_container = QWidget()
-        hag_v = QVBoxLayout(hag_container)
-        hag_v.setContentsMargins(8, 6, 8, 6)
-        hag_v.setSpacing(1)
-
-        hag_lbl = QLabel("Height Based off LIDAR")
-        hag_lbl.setObjectName("statusLabel")
+        # --- HAG ---
+        hag_container = QWidget(); hag_v = QVBoxLayout(hag_container)
+        hag_v.setContentsMargins(8, 6, 8, 6); hag_v.setSpacing(1)
+        hag_lbl = QLabel("Height Based off LIDAR"); hag_lbl.setObjectName("statusLabel")
         hag_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.hag_box = QFrame()
-        self.hag_box.setObjectName("miniBox")
-        self.hag_box.setFixedSize(260, 60)
-
-        self.hag_text = QLabel("— m")
-        self.hag_text.setAlignment(Qt.AlignCenter)
-        _hag_box_layout = QVBoxLayout(self.hag_box)
-        _hag_box_layout.setContentsMargins(4,4,4,4)
+        self.hag_box = QFrame(); self.hag_box.setObjectName("miniBox"); self.hag_box.setFixedSize(260, 60)
+        self.hag_text = QLabel("— m"); self.hag_text.setAlignment(Qt.AlignCenter)
+        _hag_box_layout = QVBoxLayout(self.hag_box); _hag_box_layout.setContentsMargins(4,4,4,4)
         _hag_box_layout.addWidget(self.hag_text, 0, Qt.AlignCenter)
-
         hag_v.addWidget(hag_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         hag_v.addWidget(self.hag_box, 0, Qt.AlignHCenter)
         left.addWidget(hag_container, 0, Qt.AlignHCenter)
 
-
         # --- Distance to Goal ---
-        dist_container = QWidget()
-        d_v = QVBoxLayout(dist_container)
-        d_v.setContentsMargins(8,6,8,6)
-        d_v.setSpacing(1)
-
-        d_lbl = QLabel("Distance to Goal")
-        d_lbl.setObjectName("statusLabel")
+        dist_container = QWidget(); d_v = QVBoxLayout(dist_container)
+        d_v.setContentsMargins(8,6,8,6); d_v.setSpacing(1)
+        d_lbl = QLabel("Distance to Goal"); d_lbl.setObjectName("statusLabel")
         d_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.dist_box = QFrame()
-        self.dist_box.setObjectName("miniBox")
-        self.dist_box.setFixedSize(260, 60)
-
-        self.dist_text = QLabel("—")
-        self.dist_text.setAlignment(Qt.AlignCenter)
-        _d_box_layout = QVBoxLayout(self.dist_box)
-        _d_box_layout.setContentsMargins(4,4,4,4)
+        self.dist_box = QFrame(); self.dist_box.setObjectName("miniBox"); self.dist_box.setFixedSize(260, 60)
+        self.dist_text = QLabel("—"); self.dist_text.setAlignment(Qt.AlignCenter)
+        _d_box_layout = QVBoxLayout(self.dist_box); _d_box_layout.setContentsMargins(4,4,4,4)
         _d_box_layout.addWidget(self.dist_text, 0, Qt.AlignCenter)
-
         d_v.addWidget(d_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         d_v.addWidget(self.dist_box, 0, Qt.AlignHCenter)
         left.addWidget(dist_container, 0, Qt.AlignHCenter)
 
-        # --- ~Time to Goal ---
-        time_container = QWidget()
-        t_v = QVBoxLayout(time_container)
-        t_v.setContentsMargins(8,6,8,6)
-        t_v.setSpacing(1)
-
-        t_lbl = QLabel("Time to Goal")
-        t_lbl.setObjectName("statusLabel")
+        # --- Time to Goal ---
+        time_container = QWidget(); t_v = QVBoxLayout(time_container)
+        t_v.setContentsMargins(8,6,8,6); t_v.setSpacing(1)
+        t_lbl = QLabel("Time to Goal"); t_lbl.setObjectName("statusLabel")
         t_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.time_box = QFrame()
-        self.time_box.setObjectName("miniBox")
-        self.time_box.setFixedSize(260, 60)
-
-        self.time_text = QLabel("—")
-        self.time_text.setAlignment(Qt.AlignCenter)
-        _t_box_layout = QVBoxLayout(self.time_box)
-        _t_box_layout.setContentsMargins(4,4,4,4)
+        self.time_box = QFrame(); self.time_box.setObjectName("miniBox"); self.time_box.setFixedSize(260, 60)
+        self.time_text = QLabel("—"); self.time_text.setAlignment(Qt.AlignCenter)
+        _t_box_layout = QVBoxLayout(self.time_box); _t_box_layout.setContentsMargins(4,4,4,4)
         _t_box_layout.addWidget(self.time_text, 0, Qt.AlignCenter)
-
         t_v.addWidget(t_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
         t_v.addWidget(self.time_box, 0, Qt.AlignHCenter)
         left.addWidget(time_container, 0, Qt.AlignHCenter)
 
-        # --- Camera / Video box ---
-        video_container = QWidget()
-        v_v = QVBoxLayout(video_container)
-        v_v.setContentsMargins(8, 6, 8, 6)
-        v_v.setSpacing(1)
-
-        v_lbl = QLabel("Camera")
-        v_lbl.setObjectName("statusLabel")
+        # --- Camera / Video ---
+        video_container = QWidget(); v_v = QVBoxLayout(video_container)
+        v_v.setContentsMargins(8, 6, 8, 6); v_v.setSpacing(1)
+        v_lbl = QLabel("Camera"); v_lbl.setObjectName("statusLabel")
         v_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
-        self.video_box = QFrame()
-        self.video_box.setObjectName("videoBox")
-        self.video_box.setFixedSize(260, 120)
-
-        self.video_placeholder = QLabel("No Video")
-        self.video_placeholder.setAlignment(Qt.AlignCenter)
+        self.video_box = QFrame(); self.video_box.setObjectName("videoBox"); self.video_box.setFixedSize(260, 120)
+        self.video_placeholder = QLabel("No Video"); self.video_placeholder.setAlignment(Qt.AlignCenter)
         self.video_placeholder.setStyleSheet("color:#333;")
-
-        self.video_label = QLabel()           # where the pixmap will go
-        self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.hide()               # hidden until first frame arrives
-
-        _vb_layout = QVBoxLayout(self.video_box)
-        _vb_layout.setContentsMargins(4,4,4,4)
-        _vb_layout.addWidget(self.video_placeholder, 1)
-        _vb_layout.addWidget(self.video_label, 1)
-
-        v_v.addWidget(v_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
-        v_v.addWidget(self.video_box, 0, Qt.AlignHCenter)
+        self.video_label = QLabel(); self.video_label.setAlignment(Qt.AlignCenter); self.video_label.hide()
+        _vb_layout = QVBoxLayout(self.video_box); _vb_layout.setContentsMargins(4,4,4,4)
+        _vb_layout.addWidget(self.video_placeholder, 1); _vb_layout.addWidget(self.video_label, 1)
+        v_v.addWidget(v_lbl, 0, Qt.AlignLeft | Qt.AlignTop); v_v.addWidget(self.video_box, 0, Qt.AlignHCenter)
         left.addWidget(video_container, 0, Qt.AlignHCenter)
 
         left.addStretch(1)
-        
-        # ----- Divider (1 px) -----
-        divider = QFrame()
-        divider.setObjectName("divider")
+
+        # ----- Divider -----
+        divider = QFrame(); divider.setObjectName("divider")
         divider.setFrameShape(QFrame.NoFrame)
         divider.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
         # ----- CONTROL column -----
-        right = QVBoxLayout()
-        right.setSpacing(0)
+        right = QVBoxLayout(); right.setSpacing(0)
 
-        # CONTROL title row (no button here anymore)
-        title_row = QHBoxLayout()
-        title_row.setContentsMargins(0, 0, 0, 0)
-        title_row.setSpacing(12)
-
-        control_title = QLabel("<u>CONTROL</u>")
-        control_title.setObjectName("paneTitle")
+        # CONTROL title
+        title_row = QHBoxLayout(); title_row.setContentsMargins(0, 0, 0, 0); title_row.setSpacing(12)
+        control_title = QLabel("<u>CONTROL</u>"); control_title.setObjectName("paneTitle")
         control_title.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        control_title.setStyleSheet("""
-            font-size: 16px;
-            font-weight: 700;
-            margin-left: 24px;
-            min-height: 1px;
-        """)
+        control_title.setStyleSheet("font-size: 16px; font-weight: 700; margin-left: 24px; min-height: 1px;")
+        title_row.addWidget(control_title, 1, Qt.AlignLeft); title_row.addStretch(1)
+        right.addLayout(title_row); right.addSpacing(18)
 
-        title_row.addWidget(control_title, 1, Qt.AlignLeft)
-        title_row.addStretch(1)
-        right.addLayout(title_row)
-        right.addSpacing(18)
+        # Container for inputs + button grid
+        grid = QWidget(); grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        grid_col = QVBoxLayout(grid); grid_col.setSpacing(18); grid_col.setContentsMargins(24, 6, 24, 6)
 
-        # Container that holds the rows of buttons.
-        grid = QWidget()
-        # IMPORTANT: let this widget expand horizontally, but stay compact vertically.
-        grid.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        # Inputs (goal, map/graphs, height)
+        inputs = QVBoxLayout(); inputs.setContentsMargins(24, 0, 24, 14); inputs.setSpacing(10)
 
-        grid_col = QVBoxLayout(grid)
-        grid_col.setSpacing(18)
-        # Inner padding so buttons don't hug the column edges.
-        grid_col.setContentsMargins(24, 6, 24, 6)
+        # Goal inputs
+        goal_row_label = QLabel("Enter Goal (X, Y)"); goal_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        goal_row_label.setMinimumHeight(24); inputs.addWidget(goal_row_label)
 
-        # --- Reusable button config ---
-        def config_btn(b: QPushButton):
-            b.setMinimumHeight(80)
-            b.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        goal_row = QHBoxLayout(); goal_row.setSpacing(12)
 
-        # ======= CONTROL INPUTS (above the big buttons) =======
-        inputs = QVBoxLayout()
-        inputs.setContentsMargins(24, 0, 24, 14)
-        inputs.setSpacing(10)
-
-        # --- Enter Goal: X Y Z + SET GOAL ---
-        goal_row_label = QLabel("Enter Goal (X, Y)")
-        goal_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        goal_row_label.setMinimumHeight(24)
-        inputs.addWidget(goal_row_label)
-
-        goal_row = QHBoxLayout()
-        goal_row.setSpacing(12)
-
-        def make_cell(placeholder):
-            le = QLineEdit()
-            le.setFixedSize(64, 48)
-            le.setAlignment(Qt.AlignCenter)
-            le.setPlaceholderText(placeholder)
+        def _make_cell(placeholder: str) -> QLineEdit:
+            le = QLineEdit(); le.setFixedSize(64, 48); le.setAlignment(Qt.AlignCenter); le.setPlaceholderText(placeholder)
             return le
 
-        self.goal_x_edit = make_cell("X")
-        self.goal_y_edit = make_cell("Y")
-
-        goal_row.addWidget(self.goal_x_edit)
-        goal_row.addWidget(self.goal_y_edit)
-
-        self.btn_set_goal = QPushButton("SET GOAL")
-        self.btn_set_goal.setObjectName("btnMove")
-        self.btn_set_goal.setMinimumHeight(48)
-        goal_row.addWidget(self.btn_set_goal, 1)
-
+        self.goal_x_edit = _make_cell("X"); self.goal_y_edit = _make_cell("Y")
+        goal_row.addWidget(self.goal_x_edit); goal_row.addWidget(self.goal_y_edit)
+        self.btn_set_goal = QPushButton("SET GOAL"); self.btn_set_goal.setObjectName("btnMove")
+        self.btn_set_goal.setMinimumHeight(48); goal_row.addWidget(self.btn_set_goal, 1)
         inputs.addLayout(goal_row)
 
-        # --- Map + Info panel ---
-        map_info_container = QWidget()
-        map_info_row = QHBoxLayout(map_info_container)
-        map_info_row.setContentsMargins(8, 6, 8, 6)
-        map_info_row.setSpacing(12)
-        
-        # Left: square map placeholder
+        # Map + Graphs block
+        map_info_container = QWidget(); map_info_row = QHBoxLayout(map_info_container)
+        map_info_row.setContentsMargins(8, 6, 8, 6); map_info_row.setSpacing(12)
+
+        # Map
         map_left = QVBoxLayout()
-        map_lbl = QLabel("Map")
-        map_lbl.setObjectName("statusLabel")
-        map_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-
-        self.map_box = QFrame()
-        self.map_box.setObjectName("mapBox")
-        self.map_box.setFixedSize(260, 260)  # square
-        _map_layout = QVBoxLayout(self.map_box)
-        _map_layout.setContentsMargins(4, 4, 4, 4)
-
-        # NEW: MapWidget with background image from repo_root/files/blankmap.png
+        map_lbl = QLabel("Map"); map_lbl.setObjectName("statusLabel"); map_lbl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.map_box = QFrame(); self.map_box.setObjectName("mapBox"); self.map_box.setFixedSize(260, 260)
+        _map_layout = QVBoxLayout(self.map_box); _map_layout.setContentsMargins(4, 4, 4, 4)
         repo_root = Path(__file__).resolve().parents[1]
         bg_path = str(repo_root / "files" / "blankmap.png")
         self.map_widget = MapWidget(bg_path, extent_half=25.0)
         _map_layout.addWidget(self.map_widget, 1)
+        map_left.addWidget(map_lbl, 0, Qt.AlignLeft | Qt.AlignTop); map_left.addWidget(self.map_box, 0, Qt.AlignLeft)
 
-        map_left.addWidget(map_lbl, 0, Qt.AlignLeft | Qt.AlignTop)
-        map_left.addWidget(self.map_box, 0, Qt.AlignLeft)
-        
-        # Right: Info panel
+        # Graph generator panel
         info_panel = QVBoxLayout()
-        info_title = QLabel("Graph Generation")
-        info_title.setObjectName("statusLabel")
+        info_title = QLabel("Graph Generation"); info_title.setObjectName("statusLabel")
         info_title.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        
-        # SHOW GRAPHS button (disabled until a file is selected)
         self.btn_show_graphs = QPushButton("GENERATE GRAPHS")
         self.btn_show_graphs.setObjectName("btnMove")
         self.btn_show_graphs.setMinimumHeight(48)
         self.btn_show_graphs.setEnabled(False)
         self.btn_show_graphs.clicked.connect(self.on_show_graphs_clicked)
-        
-        # CSV list
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.SingleSelection)
         self.file_list.currentItemChanged.connect(self._on_file_selected)
-        
-        info_panel.addWidget(info_title)
-        info_panel.addWidget(self.btn_show_graphs)
-        info_panel.addWidget(self.file_list, 1)
-        
-        # Assemble row
-        map_info_row.addLayout(map_left, 0)
-        map_info_row.addLayout(info_panel, 1)
-        
+        info_panel.addWidget(info_title); info_panel.addWidget(self.btn_show_graphs); info_panel.addWidget(self.file_list, 1)
+
+        map_info_row.addLayout(map_left, 0); map_info_row.addLayout(info_panel, 1)
         inputs.addWidget(map_info_container)
 
-
-
-        # --- Set Height + SET HEIGHT ---
-        height_row_label = QLabel("Set Height")
-        height_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        height_row_label.setMinimumHeight(24)
-        inputs.addWidget(height_row_label)
-
-        height_row = QHBoxLayout()
-        height_row.setSpacing(12)
-
-        self.height_edit = QLineEdit()
-        self.height_edit.setMinimumHeight(48)
-        self.height_edit.setAlignment(Qt.AlignCenter)
-        self.height_edit.setPlaceholderText("Height (m)")
+        # Height input
+        height_row_label = QLabel("Set Height"); height_row_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        height_row_label.setMinimumHeight(24); inputs.addWidget(height_row_label)
+        height_row = QHBoxLayout(); height_row.setSpacing(12)
+        self.height_edit = QLineEdit(); self.height_edit.setMinimumHeight(48)
+        self.height_edit.setAlignment(Qt.AlignCenter); self.height_edit.setPlaceholderText("Height (m)")
         height_row.addWidget(self.height_edit, 1)
-
-        self.btn_set_height = QPushButton("SET HEIGHT")
-        self.btn_set_height.setObjectName("btnMove")   # green style
-        self.btn_set_height.setMinimumHeight(48)
-        height_row.addWidget(self.btn_set_height, 1)
-
+        self.btn_set_height = QPushButton("SET HEIGHT"); self.btn_set_height.setObjectName("btnMove")
+        self.btn_set_height.setMinimumHeight(48); height_row.addWidget(self.btn_set_height, 1)
         inputs.addLayout(height_row)
 
-        # Put the inputs above the grid of big buttons
+        # Final assembly
         right.addLayout(inputs)
+        # Grid of big buttons
+        def _cfg(b: QPushButton) -> None:
+            b.setMinimumHeight(80); b.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # Row 1: HOVER | MOVE TO GOAL
         row1 = QHBoxLayout(); row1.setSpacing(18)
-        btn_hover = QPushButton("HOVER");        btn_hover.setObjectName("btnHover"); config_btn(btn_hover)
-        btn_move  = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   config_btn(btn_move)
-        # Equal widths across the row:
-        row1.addWidget(btn_hover, 1)
-        row1.addWidget(btn_move, 1)
-        grid_col.addLayout(row1)
+        btn_hover = QPushButton("HOVER");        btn_hover.setObjectName("btnHover"); _cfg(btn_hover)
+        btn_move  = QPushButton("MOVE TO GOAL"); btn_move.setObjectName("btnMove");   _cfg(btn_move)
+        row1.addWidget(btn_hover, 1); row1.addWidget(btn_move, 1); grid_col.addLayout(row1)
 
-
-        # Row 2: LAND | TAKEOFF
         row2 = QHBoxLayout(); row2.setSpacing(18)
-        btn_land = QPushButton("LAND");     btn_land.setObjectName("btnLand");       config_btn(btn_land)
-        btn_take = QPushButton("TAKEOFF");  btn_take.setObjectName("btnTakeoff");    config_btn(btn_take)
-        row2.addWidget(btn_land, 1)
-        row2.addWidget(btn_take, 1)
-        grid_col.addLayout(row2)
+        btn_land = QPushButton("LAND");    btn_land.setObjectName("btnLand");    _cfg(btn_land)
+        btn_take = QPushButton("TAKEOFF"); btn_take.setObjectName("btnTakeoff"); _cfg(btn_take)
+        row2.addWidget(btn_land, 1); row2.addWidget(btn_take, 1); grid_col.addLayout(row2)
 
-        # Row 3: EMERGENCY LAND (full width)
         btn_estop = QPushButton("EMERGENCY LAND"); btn_estop.setObjectName("btnEStop")
-        btn_estop.setMinimumHeight(80)
-        btn_estop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        grid_col.addWidget(btn_estop, 0)  # full width within grid
+        btn_estop.setMinimumHeight(80); btn_estop.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        grid_col.addWidget(btn_estop, 0)
 
-        # Keep the grid compact (no vertical stretching); centered by side margins.
-        right.addStretch(1)  # push content upward a little, like the mockup
+        right.addStretch(1)
         right.addWidget(grid, 1)
 
-        # Assemble root with 1:2 width ratio (STATUS : CONTROL)
-        root.addLayout(left, 1)
-        root.addWidget(divider)
-        root.addLayout(right, 2)
+        # Root layout
+        root.addLayout(left, 1); root.addWidget(divider); root.addLayout(right, 2)
 
-        # populate the CSV list on startup
+        # Populate CSV list at startup
         self._refresh_csv_list()
 
-    # (Optional) expose buttons later if you want to connect signals
-    # via properties or by storing them as self.btn_*.
-
-        def _hook(btn_text, color_hex):
+        # ---- Wire buttons to ROS commands + last command box ----
+        def _hook(btn_text: str, color_hex: str):
             return lambda: (self.ros_node.send(btn_text), self.update_last_command(btn_text, color_hex))
-        
+
         btn_hover.clicked.connect(_hook("HOVER", "#D9C40A"))
         btn_move.clicked.connect(_hook("MOVE TO GOAL", "#64B32D"))
         btn_land.clicked.connect(_hook("LAND", "#F06A1A"))
         btn_take.clicked.connect(_hook("TAKEOFF", "#0C8F24"))
         btn_estop.clicked.connect(_hook("EMERGENCY LAND", "#CF1C12"))
-
         self.btn_set_goal.clicked.connect(self.set_goal)
         self.btn_set_height.clicked.connect(self.set_height)
 
-    def set_goal(self):
+    # -------------------------------------------------------------------------
+    # Command/entry handlers
+    # -------------------------------------------------------------------------
+    def set_goal(self) -> None:
+        """
+        @brief Read goal X/Y from inputs and publish `/cmd/goal`.
+        """
         try:
             x = float(self.goal_x_edit.text())
             y = float(self.goal_y_edit.text())
@@ -837,24 +756,35 @@ class TwoPaneGUI(QWidget):
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
 
-
-    def set_height(self):
+    def set_height(self) -> None:
+        """
+        @brief Read height from input and publish `/cmd/height`.
+        """
         try:
             h = float(self.height_edit.text())
         except ValueError:
             return
         self.ros_node.publish_height(h)
 
-
-    def update_last_command(self, text: str, color_hex: str):
-        # Set text
+    # -------------------------------------------------------------------------
+    # UI updates
+    # -------------------------------------------------------------------------
+    def update_last_command(self, text: str, color_hex: str) -> None:
+        """
+        @brief Update the 'Last Command' box text and colour.
+        @param text Command text.
+        @param color_hex Background colour (hex).
+        """
         self.last_cmd_text.setText(text)
-        # Color the box background (keep border from stylesheet)
         self.last_cmd_box.setStyleSheet(
             f"#lastCmdBox {{ border: 2px solid #333333; border-radius: 4px; background: {color_hex}; }}"
         )
 
-    def update_status_box(self, status: str):
+    def update_status_box(self, status: str) -> None:
+        """
+        @brief Update status box based on incoming status string.
+        @param status Human-readable status (case-insensitive mapping is applied).
+        """
         status_key = status.strip().lower()
         mapping = {
             "pre flight checks": ("PRE-FLIGHT", "#CCCCCC"),
@@ -866,59 +796,65 @@ class TwoPaneGUI(QWidget):
             "arrived at goal":   ("ARRIVED AT GOAL", "#1A73E8"),
             "emergency landing": ("EMERGENCY LANDING", "#CF1C12"),
         }
-
-
         text, color = mapping.get(status_key, (status.upper(), "#CCCCCC"))
-
-
         self.status_text.setText(text)
         self.status_box.setStyleSheet(
             f"#statusBoxGeneric {{ border: 2px solid #333333; border-radius: 4px; background: {color}; }}"
         )
 
-    
-    def update_goal_position(self, x: float, y: float, z_unused: float = 0.0):
+    def update_goal_position(self, x: float, y: float, z_unused: float = 0.0) -> None:
+        """
+        @brief Reflect a selected/active goal in the input fields (UI convenience).
+        @param x Goal X
+        @param y Goal Y
+        @param z_unused Present for API compatibility (ignored).
+        """
         self.goal_x_edit.setText(f"{x:.2f}")
         self.goal_y_edit.setText(f"{y:.2f}")
 
-
-
-    def update_goal_distance(self, meters: float):
+    def update_goal_distance(self, meters: float) -> None:
+        """
+        @brief Update the distance-to-goal readout with metric formatting.
+        @param meters Distance in metres.
+        """
         txt = f"{meters/1000:.2f} km" if meters >= 1000 else f"{meters:.2f} m"
         self.dist_text.setText(txt)
 
-    def update_goal_eta(self, seconds: float):
+    def update_goal_eta(self, seconds: float) -> None:
+        """
+        @brief Update the time-to-goal readout (h m / m s / s).
+        @param seconds Time metric in seconds (negative clears the field).
+        """
         if seconds < 0:
             self.time_text.setText("—")
             return
-
         secs = int(seconds)
-
         if secs < 60:
-            # Less than a minute
             self.time_text.setText(f"{secs} s")
         elif secs < 3600:
-            # Less than an hour
-            m = secs // 60
-            s = secs % 60
+            m = secs // 60; s = secs % 60
             self.time_text.setText(f"{m} m {s} s")
         else:
-            # An hour or more
-            h = secs // 3600
-            m = (secs % 3600) // 60
+            h = secs // 3600; m = (secs % 3600) // 60
             self.time_text.setText(f"{h} h {m} m")
 
-    def update_hag_box(self, hag_m: float):
-        if hag_m != hag_m:  # NaN check
+    def update_hag_box(self, hag_m: float) -> None:
+        """
+        @brief Update the HAG display, handling NaN cleanly.
+        @param hag_m Height-above-ground (metres).
+        """
+        if hag_m != hag_m:  # NaN
             self.hag_text.setText("— m")
         else:
             self.hag_text.setText(f"{hag_m:.2f} m")
 
-    def update_camera_view(self, frame):
-        # frame is a cv2 BGR image (H x W x 3)
+    def update_camera_view(self, frame) -> None:
+        """
+        @brief Convert a BGR numpy frame to QImage and update preview.
+        @param frame Numpy image (H x W x 3, BGR).
+        """
         h, w, ch = frame.shape
-        bytes_per_line = ch * w
-        qimg = QImage(frame.data, w, h, bytes_per_line, QImage.Format_BGR888)
+        qimg = QImage(frame.data, w, h, ch * w, QImage.Format_BGR888)
         pm = QPixmap.fromImage(qimg)
         self.video_label.setPixmap(pm.scaled(
             self.video_box.width()-8, self.video_box.height()-8,
@@ -927,39 +863,54 @@ class TwoPaneGUI(QWidget):
         self.video_placeholder.hide()
         self.video_label.show()
 
-    def update_current_position(self, x: float, y: float, z: float):
+    def update_current_position(self, x: float, y: float, z: float) -> None:
+        """
+        @brief Update the pose readout and move the map dot.
+        @param x Current X
+        @param y Current Y
+        @param z Current Z
+        """
         self.pos_x_value.setText(f"{x:.2f}")
         self.pos_y_value.setText(f"{y:.2f}")
         self.pos_z_value.setText(f"{z:.2f}")
-        # NEW: update blue dot on the map
         if hasattr(self, "map_widget"):
             self.map_widget.set_pose(x, y)
 
 
-def main():
+# =============================================================================
+# Entry point
+# =============================================================================
+def main() -> None:
+    """
+    @brief Start the Qt application and ROS 2 node, interleaving their event loops.
+    """
     rclpy.init()
     app = QApplication(sys.argv)
+
+    # Graceful Ctrl+C
     signal.signal(signal.SIGINT, lambda *_: QApplication.quit())
-    
+
     # ROS node
     ros_node = GuiNode()
 
     # GUI
-    w = TwoPaneGUI()
-    w.ros_node = ros_node   # pass node into GUI
-    ros_node.gui_ref = w   # let the node call GUI updates
-    w.show()
+    gui = TwoPaneGUI()
+    gui.ros_node = ros_node
+    ros_node.gui_ref = gui
+    gui.show()
 
-    # Allow Qt to process ROS2 events
-    from PySide6.QtCore import QTimer
+    # Interleave ROS with Qt via timer
     timer = QTimer()
-    timer.timeout.connect(lambda: rclpy.spin_once(ros_node, timeout_sec=0))
+    timer.timeout.connect(lambda: rclpy.spin_once(ros_node, timeout_sec=0.0))
     timer.start(50)
 
-    sys.exit(app.exec())
-    rclpy.shutdown()
+    code = app.exec()
+    try:
+        rclpy.shutdown()
+    except Exception:
+        pass
+    sys.exit(code)
+
 
 if __name__ == "__main__":
     main()
-
-
